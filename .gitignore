@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+.env
+.venv
+env/
+venv/
+
+# 运行时生成目录
+uploads/
+output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 用户模板（不提交用户数据）
+user_templates/*.docx
+user_templates/*.xlsx

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>身份证信息自动提取工具</title>
+    <meta name="description" content="基于 OCR 的身份证信息自动提取、Excel 导出、模板填充工具">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>🪪 身份证提取工具</h1>
+            <div class="subtitle">Auto ID Card Extractor</div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active" data-page="recognize">
+                <span class="icon">📷</span>
+                <span>身份证识别</span>
+            </div>
+            <div class="nav-item" data-page="batch">
+                <span class="icon">📁</span>
+                <span>批量处理</span>
+            </div>
+            <div class="nav-item" data-page="templates">
+                <span class="icon">📄</span>
+                <span>模板管理</span>
+            </div>
+            <div class="nav-item" data-page="export">
+                <span class="icon">📊</span>
+                <span>数据导出</span>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="ocr-status">
+                <span class="status-dot" id="ocrStatusDot"></span>
+                <span id="ocrStatusText">检测 OCR 服务...</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main-content">
+
+        <!-- ====== 页面1: 身份证识别 ====== -->
+        <div class="page active" id="page-recognize">
+            <h2 class="page-title"><span class="icon">📷</span> 身份证识别</h2>
+
+            <div class="two-col">
+                <!-- 左侧: 上传 -->
+                <div>
+                    <div class="card">
+                        <div class="card-title">📤 上传身份证图片</div>
+                        <div class="upload-zone" id="uploadZone">
+                            <div class="upload-icon">🖼️</div>
+                            <div class="upload-text">拖拽图片到此处，或点击选择文件</div>
+                            <div class="upload-hint">支持正面和反面图片，可一次选择多张</div>
+                            <input type="file" id="fileInput" accept="image/*" multiple>
+                        </div>
+                        <div class="image-previews" id="imagePreviews">
+                            <div class="preview-slot" id="frontPreview">
+                                <div class="label">正面（人像面）</div>
+                                <div class="upload-hint">未选择</div>
+                                <button class="remove-btn" onclick="removeFront()">✕</button>
+                            </div>
+                            <div class="preview-slot" id="backPreview">
+                                <div class="label">反面（国徽面）</div>
+                                <div class="upload-hint">未选择（可选）</div>
+                                <button class="remove-btn" onclick="removeBack()">✕</button>
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" id="btnRecognize" onclick="recognize()" disabled>
+                                <span>🔍</span> 开始识别
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧: 结果 -->
+                <div>
+                    <div class="card">
+                        <div class="card-title">📋 识别结果</div>
+                        <div id="resultArea">
+                            <div class="empty-state">
+                                <div class="icon">📝</div>
+                                <p>上传身份证图片后点击识别</p>
+                            </div>
+                        </div>
+                        <div class="btn-group" id="resultActions" style="display:none;">
+                            <button class="btn btn-success" onclick="fillTemplate()">
+                                <span>📝</span> 填入模板
+                            </button>
+                            <button class="btn btn-warning" onclick="exportSingleExcel()">
+                                <span>📊</span> 导出 Excel
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 警告信息 -->
+                    <div id="warningArea"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== 页面2: 批量处理 ====== -->
+        <div class="page" id="page-batch">
+            <h2 class="page-title"><span class="icon">📁</span> 批量处理</h2>
+
+            <div class="card">
+                <div class="card-title">📤 上传批量图片</div>
+                <div class="upload-zone" id="batchUploadZone">
+                    <div class="upload-icon">📂</div>
+                    <div class="upload-text">拖拽或选择多张身份证图片</div>
+                    <div class="upload-hint">系统将自动按文件名分组（如"张三1"、"张三2"归为一组）</div>
+                    <input type="file" id="batchFileInput" accept="image/*" multiple>
+                </div>
+            </div>
+
+            <!-- 分组预览 -->
+            <div class="card" id="batchGroupCard" style="display:none;">
+                <div class="card-title">👥 分组预览</div>
+                <div id="groupPreview"></div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="btnBatchRecognize" onclick="batchRecognize()">
+                        <span>🚀</span> 开始批量识别
+                    </button>
+                </div>
+                <div class="progress-bar" id="batchProgress" style="display:none;">
+                    <div class="progress-fill" id="batchProgressFill"></div>
+                </div>
+            </div>
+
+            <!-- 批量结果 -->
+            <div class="card" id="batchResultCard" style="display:none;">
+                <div class="card-title">📋 批量识别结果</div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table" id="batchResultTable">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                <th>姓名</th>
+                                <th>性别</th>
+                                <th>民族</th>
+                                <th>出生日期</th>
+                                <th>年龄</th>
+                                <th>身份证号码</th>
+                                <th>住址</th>
+                                <th>签发机关</th>
+                                <th>有效期限</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchResultBody"></tbody>
+                    </table>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-warning" onclick="exportBatchExcel()">
+                        <span>📊</span> 导出选中到 Excel
+                    </button>
+                    <button class="btn btn-success" onclick="fillTemplateBatch()">
+                        <span>📝</span> 批量填入模板
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== 页面3: 模板管理 ====== -->
+        <div class="page" id="page-templates">
+            <h2 class="page-title"><span class="icon">📄</span> 模板管理</h2>
+
+            <div class="two-col">
+                <div>
+                    <div class="card">
+                        <div class="card-title">📤 上传模板</div>
+                        <div class="upload-zone" id="templateUploadZone">
+                            <div class="upload-icon">📎</div>
+                            <div class="upload-text">拖拽或选择模板文件</div>
+                            <div class="upload-hint">支持 .docx（Word）和 .xlsx（Excel）格式</div>
+                            <input type="file" id="templateFileInput" accept=".docx,.xlsx">
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🏷️ 可用占位符</div>
+                        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
+                            在模板中使用以下占位符，识别后将自动替换为实际值：
+                        </p>
+                        <div class="placeholder-list">
+                            <span class="placeholder-tag">{% raw %}{{姓名}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{性别}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{民族}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{出生日期}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{年龄}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{身份证号码}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{住址}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{签发机关}}{% endraw %}</span>
+                            <span class="placeholder-tag">{% raw %}{{有效期限}}{% endraw %}</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="card">
+                        <div class="card-title">📑 已上传模板</div>
+                        <div id="templateList">
+                            <div class="empty-state">
+                                <div class="icon">📄</div>
+                                <p>暂无模板，请上传</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== 页面4: 数据导出 ====== -->
+        <div class="page" id="page-export">
+            <h2 class="page-title"><span class="icon">📊</span> 数据导出</h2>
+
+            <div class="card">
+                <div class="card-title">📋 识别历史记录</div>
+                <div id="historyArea">
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <p>暂无识别记录</p>
+                    </div>
+                </div>
+                <div class="btn-group" id="exportActions" style="display:none;">
+                    <button class="btn btn-warning" onclick="exportSelectedHistory()">
+                        <span>📊</span> 导出选中到 Excel
+                    </button>
+                    <button class="btn btn-success" onclick="fillTemplateFromHistory()">
+                        <span>📝</span> 选中填入模板
+                    </button>
+                    <button class="btn btn-danger" onclick="clearHistory()">
+                        <span>🗑️</span> 清空历史
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- 加载遮罩 -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-large"></div>
+    <div class="loading-text" id="loadingText">正在识别中...</div>
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- 模板选择弹窗 -->
+<div class="loading-overlay" id="templateModal" style="display:none;">
+    <div class="card" style="max-width: 400px; width: 90%;">
+        <div class="card-title">选择模板</div>
+        <div id="templateSelectList"></div>
+        <div class="btn-group" style="justify-content: flex-end;">
+            <button class="btn btn-outline" onclick="closeTemplateModal()">取消</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
