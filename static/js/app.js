@@ -12,6 +12,9 @@ let currentBatchDir = "";
 let _pendingFillRecords = null;
 // 历史记录缓存（供选中导出/填模板使用）
 let _cachedHistoryRecords = [];
+// 原始 OCR 弹窗当前上下文（"single" | “batch”）
+let _rawOcrContext = null;
+let _rawOcrBatchIndex = -1;
 
 // ====== 初始化 ======
 document.addEventListener("DOMContentLoaded", () => {
@@ -244,6 +247,19 @@ function displayResult(data) {
             warningArea.innerHTML += `<div class="alert alert-warning">⚠️ ${w}</div>`;
         });
     }
+
+    // 显示原始 OCR 按钮（仅当有原始文本时）
+    if (data.raw_ocr_front || data.raw_ocr_back) {
+        const actionsEl = document.getElementById("resultActions");
+        // 避免重复添加
+        if (!actionsEl.querySelector(".btn-raw-ocr")) {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-raw-ocr";
+            btn.innerHTML = `<span>📜</span> 查看原始 OCR`;
+            btn.onclick = () => showRawOcrModal("single");
+            actionsEl.appendChild(btn);
+        }
+    }
 }
 
 // ====== 批量处理 ======
@@ -324,8 +340,18 @@ function displayBatchResults(results) {
     const tbody = document.getElementById("batchResultBody");
     card.style.display = "block";
 
+    // 增加"操作"列头（如果还没有）
+    const thead = document.querySelector("#batchResultTable thead tr");
+    if (!thead.querySelector(".th-raw-ocr")) {
+        const th = document.createElement("th");
+        th.className = "th-raw-ocr";
+        th.textContent = "原始";
+        thead.appendChild(th);
+    }
+
     let html = "";
     results.forEach((r, i) => {
+        const hasRaw = r.raw_ocr_front || r.raw_ocr_back;
         html += `<tr>
             <td class="checkbox-cell"><input type="checkbox" class="batch-check" data-index="${i}" checked></td>
             <td>${r.name || "-"}</td>
@@ -337,6 +363,7 @@ function displayBatchResults(results) {
             <td title="${r.address || ""}">${r.address || "-"}</td>
             <td>${r.authority || "-"}</td>
             <td>${r.validity || "-"}</td>
+            <td>${hasRaw ? `<button class="btn-raw-ocr-sm" onclick="showRawOcrModal('batch', ${i})">📜 原始</button>` : "-"}</td>
         </tr>`;
     });
     tbody.innerHTML = html;
@@ -719,4 +746,78 @@ function showToast(message, type = "success") {
 function showWarning(message) {
     const area = document.getElementById("warningArea");
     area.innerHTML += `<div class="alert alert-warning">⚠️ ${message}</div>`;
+}
+
+// ====== 原始 OCR 查看/编辑 ======
+function showRawOcrModal(context, batchIndex) {
+    _rawOcrContext = context;
+    _rawOcrBatchIndex = batchIndex !== undefined ? batchIndex : -1;
+
+    let frontLines = [];
+    let backLines = [];
+
+    if (context === "single" && currentResult) {
+        frontLines = currentResult.raw_ocr_front || [];
+        backLines = currentResult.raw_ocr_back || [];
+    } else if (context === "batch" && batchResults[batchIndex]) {
+        frontLines = batchResults[batchIndex].raw_ocr_front || [];
+        backLines = batchResults[batchIndex].raw_ocr_back || [];
+    }
+
+    document.getElementById("rawOcrFront").value = frontLines.join("\n");
+    document.getElementById("rawOcrBack").value = backLines.join("\n");
+    document.getElementById("rawOcrModal").style.display = "flex";
+}
+
+function closeRawOcrModal() {
+    document.getElementById("rawOcrModal").style.display = "none";
+    _rawOcrContext = null;
+    _rawOcrBatchIndex = -1;
+}
+
+async function reparseFromModal() {
+    const frontText = document.getElementById("rawOcrFront").value.trim();
+    const backText = document.getElementById("rawOcrBack").value.trim();
+
+    const frontLines = frontText ? frontText.split("\n").filter(l => l.trim()) : [];
+    const backLines = backText ? backText.split("\n").filter(l => l.trim()) : [];
+
+    if (frontLines.length === 0 && backLines.length === 0) {
+        showToast("请输入至少一行 OCR 文本", "warning");
+        return;
+    }
+
+    showLoading("正在重新解析...");
+
+    try {
+        const resp = await fetch("/api/ocr/reparse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ front_lines: frontLines, back_lines: backLines })
+        });
+        const data = await resp.json();
+        hideLoading();
+
+        if (data.success) {
+            if (_rawOcrContext === "single") {
+                currentResult = data.data;
+                displayResult(data.data);
+                showToast("重新解析成功！", "success");
+            } else if (_rawOcrContext === "batch" && _rawOcrBatchIndex >= 0) {
+                // 更新批量结果中对应的记录
+                batchResults[_rawOcrBatchIndex] = {
+                    ...batchResults[_rawOcrBatchIndex],
+                    ...data.data
+                };
+                displayBatchResults(batchResults);
+                showToast(`第 ${_rawOcrBatchIndex + 1} 条记录重新解析成功！`, "success");
+            }
+            closeRawOcrModal();
+        } else {
+            showToast(data.error || "解析失败", "error");
+        }
+    } catch (err) {
+        hideLoading();
+        showToast("重新解析失败: " + err.message, "error");
+    }
 }

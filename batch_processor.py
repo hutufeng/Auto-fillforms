@@ -81,12 +81,15 @@ def process_single_group(file_paths: list[str]) -> dict:
 
         data, side = parse_single_image(lines)
         if side == "both":
+            data["_raw_ocr_front"] = lines
             return {**data, "_warnings": ["单图包含正反面，已自动拆分"]}
         elif side == "front":
             warnings.append("仅识别到正面，反面信息缺失")
+            data["_raw_ocr_front"] = lines
             return {**data, "_warnings": warnings}
         elif side == "back":
             warnings.append("仅识别到反面，正面信息缺失")
+            data["_raw_ocr_back"] = lines
             return {**data, "_warnings": warnings}
         else:
             return {"_error": "无法识别为身份证", "_warnings": ["未检测到身份证关键词"]}
@@ -122,6 +125,11 @@ def process_single_group(file_paths: list[str]) -> dict:
             warnings.append("反面信息缺失")
 
         data["_warnings"] = warnings
+        # 保留原始 OCR 文本行
+        if front_lines:
+            data["_raw_ocr_front"] = front_lines
+        if back_lines:
+            data["_raw_ocr_back"] = back_lines
         return data
 
 

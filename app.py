@@ -89,6 +89,7 @@ def recognize():
             if side == "both":
                 # 单图包含正反面
                 data["_warnings"] = ["单图包含正反面，已自动拆分"]
+                data["_raw_ocr_front"] = lines
                 _add_to_history(data)
                 return jsonify({"success": True, "data": _clean_data(data)})
             elif side == "front":
@@ -112,6 +113,7 @@ def recognize():
                 warnings.append("上传为反面的图片被识别为正面")
             elif side_b == "both":
                 data_b["_warnings"] = ["单图包含正反面，已自动拆分"]
+                data_b["_raw_ocr_front"] = lines
                 _add_to_history(data_b)
                 return jsonify({"success": True, "data": _clean_data(data_b)})
             else:
@@ -124,6 +126,11 @@ def recognize():
 
     data = parse_id_card(front_lines or [], back_lines)
     data["_warnings"] = warnings
+    # 保留原始 OCR 文本行
+    if front_lines:
+        data["_raw_ocr_front"] = front_lines
+    if back_lines:
+        data["_raw_ocr_back"] = back_lines
     _add_to_history(data)
     return jsonify({"success": True, "data": _clean_data(data)})
 
@@ -328,6 +335,11 @@ def _clean_data(data: dict) -> dict:
         clean["group_name"] = data["_group_name"]
     if "_files" in data:
         clean["files"] = data["_files"]
+    # 保留原始 OCR 文本
+    if "_raw_ocr_front" in data:
+        clean["raw_ocr_front"] = data["_raw_ocr_front"]
+    if "_raw_ocr_back" in data:
+        clean["raw_ocr_back"] = data["_raw_ocr_back"]
     return clean
 
 
@@ -336,6 +348,25 @@ def _add_to_history(data: dict):
     clean = _clean_data(data)
     clean["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     recognition_history.append(clean)
+
+
+@app.route("/api/ocr/reparse", methods=["POST"])
+def reparse():
+    """根据用户编辑后的原始 OCR 文本行重新解析身份证信息"""
+    data = request.get_json()
+    front_lines = data.get("front_lines", [])
+    back_lines = data.get("back_lines", [])
+
+    if not front_lines and not back_lines:
+        return jsonify({"error": "请提供 OCR 文本行"}), 400
+
+    result = parse_id_card(front_lines or [], back_lines or None)
+    # 附带原始文本
+    if front_lines:
+        result["_raw_ocr_front"] = front_lines
+    if back_lines:
+        result["_raw_ocr_back"] = back_lines
+    return jsonify({"success": True, "data": _clean_data(result)})
 
 
 if __name__ == "__main__":

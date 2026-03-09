@@ -262,6 +262,30 @@
     </div>
 </div>
 
+<!-- 原始 OCR 内容弹窗 -->
+<div class="loading-overlay" id="rawOcrModal" style="display:none;">
+    <div class="card raw-ocr-card">
+        <div class="card-title">📜 原始 OCR 识别内容</div>
+        <div class="raw-ocr-hint">以下为 OCR 识别的原始文本，每行一条。您可以手动编辑后点击"重新解析"更新结果。</div>
+        <div class="raw-ocr-body">
+            <div class="raw-ocr-section">
+                <label>正面（人像面）文本：</label>
+                <textarea id="rawOcrFront" rows="8" placeholder="无正面 OCR 文本"></textarea>
+            </div>
+            <div class="raw-ocr-section">
+                <label>反面（国徽面）文本：</label>
+                <textarea id="rawOcrBack" rows="5" placeholder="无反面 OCR 文本"></textarea>
+            </div>
+        </div>
+        <div class="btn-group" style="justify-content: flex-end;">
+            <button class="btn btn-primary" onclick="reparseFromModal()">
+                <span>🔄</span> 重新解析
+            </button>
+            <button class="btn btn-outline" onclick="closeRawOcrModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
 <script src="/static/js/app.js"></script>
 </body>
 </html>

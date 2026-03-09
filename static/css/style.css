@@ -755,3 +755,88 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+/* ====== 原始 OCR 模态框 ====== */
+.raw-ocr-card {
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.raw-ocr-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.raw-ocr-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.raw-ocr-section label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent-cyan);
+    margin-bottom: 8px;
+}
+
+.raw-ocr-section textarea {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 12px;
+    resize: vertical;
+    line-height: 1.6;
+    transition: var(--transition);
+}
+
+.raw-ocr-section textarea:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(74, 125, 255, 0.2);
+}
+
+.raw-ocr-section textarea::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* 查看原始 OCR 按钮（单张识别） */
+.btn-raw-ocr {
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: var(--accent-purple);
+}
+
+.btn-raw-ocr:hover:not(:disabled) {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: var(--accent-purple);
+}
+
+/* 批量表格中的原始 OCR 小按钮 */
+.btn-raw-ocr-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 6px;
+    color: var(--accent-purple);
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-raw-ocr-sm:hover {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: var(--accent-purple);
+}
+
