@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """身份证 OCR 文本解析模块：将 OCR 原始文本行解析为结构化身份证数据"""
 
+from __future__ import annotations
 import re
 from id_calculator import extract_birthday, calc_age, extract_gender, validate_id
 
@@ -70,6 +71,8 @@ def parse_front(lines: list[str]) -> dict:
         result["birthday"] = extract_birthday(id_number)
         result["age"] = calc_age(id_number)
         result["gender"] = extract_gender(id_number)
+        if not validate_id(id_number):
+            result.setdefault("_warnings", []).append("身份证号码校验位不匹配，疑似个别数字识别错误")
 
     # 2. 提取姓名
     name = _extract_field(lines, "姓名")

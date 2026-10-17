@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """UMI-OCR HTTP 调用模块"""
 
+from __future__ import annotations
 import base64
 import requests
 from config import OCR_API_URL, OCR_TIMEOUT

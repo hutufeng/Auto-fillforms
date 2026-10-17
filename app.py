@@ -4,10 +4,14 @@
 import os
 import uuid
 import json
+import re
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, send_from_directory
 
-from config import UPLOAD_DIR, OUTPUT_DIR, USER_TEMPLATES_DIR, SUPPORTED_IMAGE_EXTS
+from config import (
+    UPLOAD_DIR, OUTPUT_DIR, USER_TEMPLATES_DIR, SUPPORTED_IMAGE_EXTS,
+    MAX_HISTORY_SIZE
+)
 from ocr_client import check_ocr_service, ocr_image
 from id_parser import parse_single_image, parse_id_card, is_front_side, is_back_side
 from id_calculator import validate_id
@@ -22,6 +26,9 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 recognition_history = []
 
 
+from security import safe_filename as _safe_filename, is_safe_path as _is_safe_path
+
+
 def _allowed_image(filename):
     ext = os.path.splitext(filename)[1].lower()
     return ext in SUPPORTED_IMAGE_EXTS
@@ -33,11 +40,10 @@ def _allowed_template(filename):
 
 
 def _save_upload(file, subdir=""):
-    """保存上传文件，返回保存路径"""
+    """安全保存上传文件，返回保存路径"""
     target_dir = os.path.join(UPLOAD_DIR, subdir) if subdir else UPLOAD_DIR
     os.makedirs(target_dir, exist_ok=True)
-    # 保留原始文件名
-    filename = file.filename
+    filename = _safe_filename(file.filename)
     filepath = os.path.join(target_dir, filename)
     # 避免覆盖
     if os.path.exists(filepath):
@@ -125,7 +131,8 @@ def recognize():
         return jsonify({"error": "无法识别身份证信息", "warnings": warnings}), 400
 
     data = parse_id_card(front_lines or [], back_lines)
-    data["_warnings"] = warnings
+    if warnings:
+        data.setdefault("_warnings", []).extend(warnings)
     # 保留原始 OCR 文本行
     if front_lines:
         data["_raw_ocr_front"] = front_lines
@@ -150,7 +157,8 @@ def batch_upload():
     saved = 0
     for f in files:
         if f.filename and _allowed_image(f.filename):
-            f.save(os.path.join(batch_dir, f.filename))
+            safe_name = _safe_filename(f.filename)
+            f.save(os.path.join(batch_dir, safe_name))
             saved += 1
 
     if saved == 0:
@@ -181,8 +189,8 @@ def batch_recognize():
     data = request.get_json()
     batch_dir = data.get("batch_dir")
 
-    if not batch_dir or not os.path.isdir(batch_dir):
-        return jsonify({"error": "批次目录不存在"}), 400
+    if not batch_dir or not os.path.isdir(batch_dir) or not _is_safe_path(UPLOAD_DIR, batch_dir):
+        return jsonify({"error": "批次目录不存在或路径非法"}), 400
 
     results = process_batch(batch_dir)
 
@@ -213,10 +221,11 @@ def export_excel():
 
 @app.route("/api/download/<filename>")
 def download_file(filename):
-    """下载输出文件"""
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    if os.path.exists(filepath):
-        return send_file(filepath, as_attachment=True)
+    """安全下载输出文件"""
+    safe_name = _safe_filename(filename)
+    filepath = os.path.join(OUTPUT_DIR, safe_name)
+    if os.path.exists(filepath) and _is_safe_path(OUTPUT_DIR, filepath):
+        return send_from_directory(OUTPUT_DIR, safe_name, as_attachment=True)
     return jsonify({"error": "文件不存在"}), 404
 
 
@@ -227,9 +236,10 @@ def upload_template():
     if not file or not _allowed_template(file.filename):
         return jsonify({"error": "请上传 .docx 或 .xlsx 模板文件"}), 400
 
-    filepath = os.path.join(USER_TEMPLATES_DIR, file.filename)
+    safe_name = _safe_filename(file.filename)
+    filepath = os.path.join(USER_TEMPLATES_DIR, safe_name)
     file.save(filepath)
-    return jsonify({"success": True, "filename": file.filename})
+    return jsonify({"success": True, "filename": safe_name})
 
 
 @app.route("/api/template/list", methods=["GET"])
@@ -250,12 +260,15 @@ def list_templates():
 
 @app.route("/api/template/delete", methods=["POST"])
 def delete_template():
-    """删除模板"""
+    """安全删除模板文件"""
     data = request.get_json()
     filename = data.get("filename")
     if not filename:
         return jsonify({"error": "未指定文件名"}), 400
-    filepath = os.path.join(USER_TEMPLATES_DIR, filename)
+    safe_name = _safe_filename(filename)
+    filepath = os.path.join(USER_TEMPLATES_DIR, safe_name)
+    if not _is_safe_path(USER_TEMPLATES_DIR, filepath):
+        return jsonify({"error": "非法文件路径"}), 403
     if os.path.exists(filepath):
         os.remove(filepath)
         return jsonify({"success": True})
@@ -272,20 +285,22 @@ def fill_template_api():
     if not template_name or not records:
         return jsonify({"error": "请指定模板和数据"}), 400
 
-    template_path = os.path.join(USER_TEMPLATES_DIR, template_name)
-    if not os.path.exists(template_path):
+    safe_tmpl_name = _safe_filename(template_name)
+    template_path = os.path.join(USER_TEMPLATES_DIR, safe_tmpl_name)
+    if not os.path.exists(template_path) or not _is_safe_path(USER_TEMPLATES_DIR, template_path):
         return jsonify({"error": f"模板 {template_name} 不存在"}), 404
 
     ext = os.path.splitext(template_name)[1].lower()
 
     if len(records) == 1:
         name = records[0].get("name", "output")
-        filename = f"{name}_filled{ext}"
+        safe_base_name = _safe_filename(name) or "output"
+        filename = f"{safe_base_name}_filled{ext}"
         output_path = os.path.join(OUTPUT_DIR, filename)
         # 避免覆盖同名文件
         counter = 1
         while os.path.exists(output_path):
-            filename = f"{name}_filled_{counter}{ext}"
+            filename = f"{safe_base_name}_filled_{counter}{ext}"
             output_path = os.path.join(OUTPUT_DIR, filename)
             counter += 1
         try:
@@ -344,10 +359,12 @@ def _clean_data(data: dict) -> dict:
 
 
 def _add_to_history(data: dict):
-    """添加到识别历史"""
+    """添加到识别历史并控制容量上限"""
     clean = _clean_data(data)
     clean["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     recognition_history.append(clean)
+    if len(recognition_history) > MAX_HISTORY_SIZE:
+        del recognition_history[:-MAX_HISTORY_SIZE]
 
 
 @app.route("/api/ocr/reparse", methods=["POST"])

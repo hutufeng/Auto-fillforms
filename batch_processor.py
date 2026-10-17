@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """批量处理模块：文件名分组 + 批量 OCR 识别"""
 
+from __future__ import annotations
 import os
 import re
 from config import SUPPORTED_IMAGE_EXTS

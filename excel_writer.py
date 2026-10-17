@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Excel 数据存储模块：支持创建和追加"""
 
+from __future__ import annotations
 import os
 from openpyxl import Workbook, load_workbook
 

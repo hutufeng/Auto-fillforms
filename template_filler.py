@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """模板填充模块：支持 Word (docxtpl) 和 Excel (openpyxl) 模板"""
 
+from __future__ import annotations
 import os
 import re
 from docxtpl import DocxTemplate
