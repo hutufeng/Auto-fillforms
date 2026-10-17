@@ -33,3 +33,9 @@ desktop.ini
 # 用户模板（不提交用户数据）
 user_templates/*.docx
 user_templates/*.xlsx
+
+# 商业授权凭证（防泄露，禁止推送）
+*.lic
+*.lic.token
+license.lic
+license.lic.token

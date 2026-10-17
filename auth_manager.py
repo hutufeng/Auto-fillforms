@@ -110,6 +110,36 @@ def _verify_signature(public_key_pem: str, data_bytes: bytes, sig_base64: str) -
         return False
 
 
+def _extract_signable_payload(data: dict) -> str:
+    """严格与 C# 服务端 ExtractSignablePayload 对齐的验签明文构造"""
+    sb = []
+    def append_val(val):
+        if isinstance(val, bool):
+            sb.append(("True" if val else "False") + '|')
+        else:
+            sb.append(str(val) + '|')
+
+    for k in ['license_id', 'product_id', 'customer_name', 'max_version', 'max_build_date', 'allow_vm']:
+        if k in data:
+            append_val(data[k])
+
+    hw = data.get('hardware_policy', {})
+    for k in ['bind_enabled', 'f1', 'f2', 'f3', 'tolerance']:
+        if k in hw:
+            append_val(hw[k])
+
+    tp = data.get('time_policy', {})
+    for k in ['type', 'expire_date', 'duration_days']:
+        if k in tp:
+            append_val(tp[k])
+
+    ep = data.get('encrypted_payload', '')
+    if ep:
+        sb.append(str(ep))
+
+    return ''.join(sb)
+
+
 class AuthManager:
     """单例授权管理器"""
     _instance = None
@@ -156,33 +186,33 @@ class AuthManager:
             if not sig_b64:
                 return False, "凭证缺失签名", {}
 
-            # 签名体数据 (将 signature 字段剔除后序列化验签)
-            payload_copy = {k: v for k, v in lic_data.items() if k != "signature"}
-            payload_bytes = json.dumps(payload_copy, separators=(',', ':'), sort_keys=True).encode('utf-8')
+            # 严格构建验签明文
+            payload_str = _extract_signable_payload(lic_data)
 
             # 1. 签名验证
-            if not _verify_signature(self.public_key, payload_bytes, sig_b64):
+            if not _verify_signature(self.public_key, payload_str.encode('utf-8'), sig_b64):
                 return False, "授权签名校验未通过，凭证非法或已被篡改", {}
 
             # 2. 产品 ID 比对
-            lic_prod = lic_data.get("product_id") or payload_copy.get("product_id", "")
+            lic_prod = lic_data.get("product_id", "")
             if lic_prod and lic_prod.upper() != self.product_id.upper():
                 return False, f"授权与当前产品不匹配 (要求 {self.product_id})", {}
 
-            # 3. 硬件指纹比对
-            bind_hw = lic_data.get("bind_hardware", True)
-            bound_hwid = lic_data.get("bound_hwid", "")
-            if bind_hw and bound_hwid and bound_hwid != self.machine_code:
-                return False, f"授权与本机硬件不匹配，请换机解绑", {}
-
-            # 4. 有效期校验
-            is_perpetual = lic_data.get("is_perpetual", False)
+            # 3. 有效期校验
+            tp = lic_data.get("time_policy", {})
+            tp_type = tp.get("type", "perpetual")
+            is_perpetual = tp_type == "perpetual" or lic_data.get("is_perpetual", False)
             if not is_perpetual:
-                valid_until = lic_data.get("valid_until", 0)
-                if valid_until and datetime.now(timezone.utc).timestamp() > valid_until:
-                    return False, "授权已到期，请续费激活", lic_data
+                exp_str = tp.get("expire_date", "")
+                if exp_str:
+                    try:
+                        exp_dt = datetime.fromisoformat(exp_str.replace("Z", "+00:00"))
+                        if datetime.now(timezone.utc) > exp_dt:
+                            return False, "授权已到期，请续费激活", lic_data
+                    except Exception:
+                        pass
 
-            # 5. 功能位校验 (需具备 standard 权限)
+            # 4. 功能位校验 (需具备 standard 权限)
             features = lic_data.get("features", [])
             if self.required_feature not in features:
                 return False, f"当前授权未包含核心功能 [{self.required_feature}]", lic_data
@@ -198,12 +228,22 @@ class AuthManager:
         remaining_days = -1
         expire_at_str = "永久有效"
 
-        if is_valid and not lic_data.get("is_perpetual", False):
-            valid_until = lic_data.get("valid_until", 0)
-            if valid_until:
-                diff_sec = valid_until - datetime.now(timezone.utc).timestamp()
-                remaining_days = max(0, int(diff_sec // 86400))
-                expire_at_str = datetime.fromtimestamp(valid_until).strftime("%Y-%m-%d %H:%M")
+        if is_valid:
+            tp = lic_data.get("time_policy", {})
+            tp_type = tp.get("type", "perpetual")
+            is_perpetual = tp_type == "perpetual" or lic_data.get("is_perpetual", False)
+            if not is_perpetual:
+                exp_str = tp.get("expire_date", "")
+                if exp_str:
+                    try:
+                        exp_dt = datetime.fromisoformat(exp_str.replace("Z", "+00:00"))
+                        diff_sec = (exp_dt - datetime.now(timezone.utc)).total_seconds()
+                        remaining_days = max(0, int(diff_sec // 86400))
+                        expire_at_str = exp_dt.strftime("%Y-%m-%d %H:%M")
+                    except Exception:
+                        expire_at_str = exp_str
+            else:
+                expire_at_str = "永久有效"
 
         return {
             "is_valid": is_valid,
@@ -211,12 +251,12 @@ class AuthManager:
             "product_id": self.product_id,
             "product_name": PRODUCT_NAME,
             "machine_code": self.machine_code,
-            "is_perpetual": lic_data.get("is_perpetual", False) if is_valid else False,
+            "is_perpetual": (lic_data.get("time_policy", {}).get("type") == "perpetual") if is_valid else False,
             "remaining_days": remaining_days,
             "expire_at": expire_at_str,
             "features": lic_data.get("features", []) if is_valid else [],
             "license_id": lic_data.get("license_id", "") if is_valid else "",
-            "allow_unbind": lic_data.get("allow_unbind", True) if is_valid else False
+            "allow_unbind": True
         }
 
     def activate_online(self, auth_code: str) -> tuple[bool, str]:
@@ -233,14 +273,19 @@ class AuthManager:
             "platform": "Windows"
         }
 
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "HutuClientPython/1.0"
+        }
+
         try:
             req = urllib.request.Request(
                 f"{self.server_url}/api/v1/activate",
                 data=json.dumps(payload).encode('utf-8'),
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 if data.get("code") == 0:
                     lic_content = data["data"]["license_file_content"]
@@ -259,8 +304,10 @@ class AuthManager:
                     return False, data.get("message", "激活失败，卡密错误或已失效")
         except urllib.error.HTTPError as he:
             try:
-                err_data = json.loads(he.read().decode('utf-8'))
-                return False, err_data.get("message", f"激活失败 (HTTP {he.code})")
+                raw_body = he.read().decode('utf-8', errors='replace')
+                err_data = json.loads(raw_body)
+                msg = err_data.get("message") or err_data.get("error") or f"HTTP {he.code}"
+                return False, f"{msg}"
             except Exception:
                 return False, f"激活请求失败: HTTP {he.code}"
         except Exception as e:
