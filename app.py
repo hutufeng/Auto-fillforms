@@ -12,21 +12,20 @@ from config import (
     UPLOAD_DIR, OUTPUT_DIR, USER_TEMPLATES_DIR, SUPPORTED_IMAGE_EXTS,
     MAX_HISTORY_SIZE
 )
-from ocr_client import check_ocr_service, ocr_image
+from ocr_client import check_ocr_service, ocr_image, get_ocr_engine_name
 from id_parser import parse_single_image, parse_id_card, is_front_side, is_back_side
 from id_calculator import validate_id
 from excel_writer import write_to_excel, write_batch_to_excel
 from template_filler import fill_template, batch_fill_template
 from batch_processor import group_files, process_single_group, process_batch
+from security import safe_filename as _safe_filename, is_safe_path as _is_safe_path
+from auth_manager import auth_manager, require_auth
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 
 # 内存中存储识别历史（生产环境应使用数据库）
 recognition_history = []
-
-
-from security import safe_filename as _safe_filename, is_safe_path as _is_safe_path
 
 
 def _allowed_image(filename):
@@ -60,16 +59,49 @@ def index():
     return render_template("index.html")
 
 
-# ====== API 路由 ======
+# ====== 商业授权 API ======
+
+@app.route("/api/auth/status", methods=["GET"])
+def auth_status():
+    """获取当前授权状态、机器码与到期信息"""
+    return jsonify(auth_manager.get_status())
+
+
+@app.route("/api/auth/activate", methods=["POST"])
+def auth_activate():
+    """激活卡密"""
+    data = request.get_json() or {}
+    auth_code = data.get("auth_code", "")
+    ok, msg = auth_manager.activate_online(auth_code)
+    status = auth_manager.get_status()
+    if ok:
+        return jsonify({"success": True, "message": msg, "status": status})
+    return jsonify({"success": False, "error": msg, "status": status}), 400
+
+
+@app.route("/api/auth/unbind", methods=["POST"])
+def auth_unbind():
+    """换机解绑"""
+    data = request.get_json() or {}
+    auth_code = data.get("auth_code", "")
+    ok, msg = auth_manager.unbind_online(auth_code)
+    if ok:
+        return jsonify({"success": True, "message": msg})
+    return jsonify({"success": False, "error": msg}), 400
+
+
+# ====== OCR 与业务 API ======
 
 @app.route("/api/ocr/status", methods=["GET"])
 def ocr_status():
-    """检查 OCR 服务状态"""
+    """检查 OCR 服务状态及引擎名称"""
     online = check_ocr_service()
-    return jsonify({"online": online})
+    engine_name = get_ocr_engine_name()
+    return jsonify({"online": online, "engine": engine_name})
 
 
 @app.route("/api/ocr/recognize", methods=["POST"])
+@require_auth
 def recognize():
     """
     识别上传的身份证图片。
@@ -184,6 +216,7 @@ def batch_upload():
 
 
 @app.route("/api/batch/recognize", methods=["POST"])
+@require_auth
 def batch_recognize():
     """批量识别已上传的图片"""
     data = request.get_json()
@@ -204,6 +237,7 @@ def batch_recognize():
 
 
 @app.route("/api/export/excel", methods=["POST"])
+@require_auth
 def export_excel():
     """导出数据到 Excel"""
     data = request.get_json()
@@ -276,6 +310,7 @@ def delete_template():
 
 
 @app.route("/api/template/fill", methods=["POST"])
+@require_auth
 def fill_template_api():
     """填充模板"""
     data = request.get_json()

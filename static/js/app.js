@@ -16,13 +16,179 @@ let _cachedHistoryRecords = [];
 let _rawOcrContext = null;
 let _rawOcrBatchIndex = -1;
 
+// 当前机器码与授权状态缓存
+let _currentAuthStatus = null;
+
 // ====== 初始化 ======
 document.addEventListener("DOMContentLoaded", () => {
     initNavigation();
     initUploadZones();
+    checkAuthStatus();
     checkOcrStatus();
     setInterval(checkOcrStatus, 30000);
 });
+
+// ====== 商业授权模块 ======
+async function checkAuthStatus() {
+    try {
+        const resp = await fetch("/api/auth/status");
+        const status = await resp.json();
+        _currentAuthStatus = status;
+
+        // 更新顶部机器码与弹窗机器码
+        const topHwid = document.getElementById("topHwidCode");
+        const modalHwid = document.getElementById("modalMachineCode");
+        if (topHwid) topHwid.textContent = status.machine_code || "HWID-UNKNOWN";
+        if (modalHwid) modalHwid.value = status.machine_code || "";
+
+        // 更新侧边栏与顶部状态胶囊
+        const badgeText = document.getElementById("authBadgeText");
+        const daysHint = document.getElementById("authDaysHint");
+        const dot = document.getElementById("authIndicatorDot");
+        const topAuthBtnText = document.getElementById("topAuthBtnText");
+
+        // 弹窗内部信息
+        const licInfoStatus = document.getElementById("licInfoStatus");
+        const licInfoExpire = document.getElementById("licInfoExpire");
+
+        if (status.is_valid) {
+            dot.className = "status-indicator-dot active";
+            const expText = status.is_perpetual ? "永久有效" : `剩余 ${status.remaining_days} 天`;
+            badgeText.textContent = "标准核心版";
+            daysHint.textContent = expText;
+            if (topAuthBtnText) topAuthBtnText.textContent = "已激活";
+
+            if (licInfoStatus) {
+                licInfoStatus.textContent = "已激活 (合法有效)";
+                licInfoStatus.style.color = "var(--accent-emerald)";
+            }
+            if (licInfoExpire) licInfoExpire.textContent = status.expire_at || "永久有效";
+        } else {
+            dot.className = "status-indicator-dot unverified";
+            badgeText.textContent = "未激活 (待授权)";
+            daysHint.textContent = "点击输入卡密激活";
+            if (topAuthBtnText) topAuthBtnText.textContent = "未激活";
+
+            if (licInfoStatus) {
+                licInfoStatus.textContent = "未激活 (" + (status.message || "无凭证") + ")";
+                licInfoStatus.style.color = "var(--accent-amber)";
+            }
+            if (licInfoExpire) licInfoExpire.textContent = "未授权";
+        }
+    } catch (e) {
+        console.error("授权状态检测失败:", e);
+    }
+}
+
+function copyMachineCode() {
+    const code = _currentAuthStatus?.machine_code || document.getElementById("topHwidCode")?.textContent;
+    if (code && code !== "获取中...") {
+        navigator.clipboard.writeText(code).then(() => {
+            showToast("机器码已复制到剪贴板，可发给闲鱼卖家获取卡密", "success");
+        }).catch(() => {
+            showToast("复制失败，请手动在弹窗中选择复制", "warning");
+            openAuthModal();
+        });
+    } else {
+        openAuthModal();
+    }
+}
+
+function copyModalHwid() {
+    const input = document.getElementById("modalMachineCode");
+    if (input) {
+        input.select();
+        navigator.clipboard.writeText(input.value).then(() => {
+            showToast("机器码已复制！", "success");
+        }).catch(() => {
+            document.execCommand("copy");
+            showToast("机器码已复制！", "success");
+        });
+    }
+}
+
+function openAuthModal() {
+    const modal = document.getElementById("authModal");
+    if (modal) {
+        modal.style.display = "flex";
+        checkAuthStatus();
+    }
+}
+
+function closeAuthModal() {
+    const modal = document.getElementById("authModal");
+    if (modal) modal.style.display = "none";
+}
+
+async function submitActivation() {
+    const input = document.getElementById("authCodeInput");
+    const code = input?.value?.trim();
+    if (!code) {
+        showToast("请输入16位激活卡密", "warning");
+        input?.focus();
+        return;
+    }
+
+    const btn = document.getElementById("btnDoActivate");
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = "<span>⏳</span> 正在联网验证...";
+
+    try {
+        const resp = await fetch("/api/auth/activate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ auth_code: code })
+        });
+        const res = await resp.json();
+        if (resp.ok && res.success) {
+            showToast(res.message || "激活成功，核心功能已解锁！", "success");
+            input.value = "";
+            await checkAuthStatus();
+            setTimeout(closeAuthModal, 1200);
+        } else {
+            showToast(res.error || "激活失败，请检查卡密是否正确", "error");
+        }
+    } catch (e) {
+        showToast("无法连接授权服务器，请检查网络", "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+async function submitUnbind() {
+    const code = prompt("请输入您当前设备绑定的激活码以执行换机解绑：");
+    if (!code || !code.trim()) return;
+
+    if (!confirm("确定要解绑当前设备的授权吗？解绑后本机需重新激活才可使用。")) return;
+
+    showLoading("正在提交解绑请求...");
+    try {
+        const resp = await fetch("/api/auth/unbind", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ auth_code: code.trim() })
+        });
+        const res = await resp.json();
+        hideLoading();
+        if (resp.ok && res.success) {
+            showToast("解绑成功！", "success");
+            await checkAuthStatus();
+        } else {
+            showToast(res.error || "解绑失败", "error");
+        }
+    } catch (e) {
+        hideLoading();
+        showToast("解绑请求异常: " + e.message, "error");
+    }
+}
+
+function copyTag(tagText) {
+    navigator.clipboard.writeText(tagText).then(() => {
+        showToast(`已复制占位符: ${tagText}`, "success");
+    });
+}
 
 // ====== 导航 ======
 function initNavigation() {
@@ -33,6 +199,12 @@ function initNavigation() {
             item.classList.add("active");
             document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
             document.getElementById(`page-${page}`).classList.add("active");
+
+            // 更新顶部面包屑标题
+            const titleEl = document.getElementById("currentPageTitle");
+            const navText = item.querySelector(".nav-text")?.textContent || "工作台";
+            if (titleEl) titleEl.textContent = navText;
+
             if (page === "templates") loadTemplates();
             if (page === "export") loadHistory();
         });
@@ -46,16 +218,20 @@ async function checkOcrStatus() {
         const data = await resp.json();
         const dot = document.getElementById("ocrStatusDot");
         const text = document.getElementById("ocrStatusText");
+        const engineLabel = data.engine ? data.engine : "OCR 引擎";
         if (data.online) {
-            dot.classList.add("online");
-            text.textContent = "OCR 服务在线";
+            dot.className = "pulse-dot";
+            text.textContent = engineLabel + " (已就绪)";
         } else {
-            dot.classList.remove("online");
-            text.textContent = "OCR 服务离线";
+            dot.className = "pulse-dot";
+            dot.style.backgroundColor = "var(--accent-amber)";
+            text.textContent = engineLabel + " (等待启动)";
         }
     } catch {
-        document.getElementById("ocrStatusDot").classList.remove("online");
-        document.getElementById("ocrStatusText").textContent = "OCR 服务离线";
+        const dot = document.getElementById("ocrStatusDot");
+        const text = document.getElementById("ocrStatusText");
+        if (dot) dot.style.backgroundColor = "var(--accent-rose)";
+        if (text) text.textContent = "OCR 服务异常";
     }
 }
 
@@ -186,6 +362,12 @@ async function recognize() {
         const resp = await fetch("/api/ocr/recognize", { method: "POST", body: formData });
         const data = await resp.json();
         hideLoading();
+
+        if (resp.status === 403 && data.auth_required) {
+            showToast("该功能需要商业激活，请先完成授权", "warning");
+            openAuthModal();
+            return;
+        }
 
         if (data.success) {
             currentResult = data.data;
@@ -321,6 +503,12 @@ async function batchRecognize() {
         document.getElementById("batchProgressFill").style.width = "100%";
         const data = await resp.json();
         hideLoading();
+
+        if (resp.status === 403 && data.auth_required) {
+            showToast("批量识别需要商业激活，请先完成授权", "warning");
+            openAuthModal();
+            return;
+        }
 
         if (data.success) {
             batchResults = data.results;

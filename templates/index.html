@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>身份证信息自动提取工具</title>
-    <meta name="description" content="基于 OCR 的身份证信息自动提取、Excel 导出、模板填充工具">
+    <title>身份证OCR - 商业标准版</title>
+    <meta name="description" content="专业身份证信息自动提取、Excel 导出与 Word/Excel 模板智能批量套打工具">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -13,273 +16,436 @@
     <!-- 侧边栏 -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <h1>🪪 身份证提取工具</h1>
-            <div class="subtitle">Auto ID Card Extractor</div>
+            <div class="brand-logo">
+                <span class="brand-icon">🪪</span>
+                <div class="brand-titles">
+                    <h1>身份证OCR</h1>
+                    <span class="badge-edition">商业标准版</span>
+                </div>
+            </div>
+            <div class="subtitle">智能识别 · 批量套打 · 离线安全</div>
         </div>
+
         <nav class="sidebar-nav">
             <div class="nav-item active" data-page="recognize">
                 <span class="icon">📷</span>
-                <span>身份证识别</span>
+                <span class="nav-text">单图极速识别</span>
             </div>
             <div class="nav-item" data-page="batch">
                 <span class="icon">📁</span>
-                <span>批量处理</span>
+                <span class="nav-text">批量分组套打</span>
             </div>
             <div class="nav-item" data-page="templates">
                 <span class="icon">📄</span>
-                <span>模板管理</span>
+                <span class="nav-text">模板智能管理</span>
             </div>
             <div class="nav-item" data-page="export">
                 <span class="icon">📊</span>
-                <span>数据导出</span>
+                <span class="nav-text">数据导出台账</span>
             </div>
         </nav>
+
         <div class="sidebar-footer">
-            <div class="ocr-status">
-                <span class="status-dot" id="ocrStatusDot"></span>
-                <span id="ocrStatusText">检测 OCR 服务...</span>
+            <!-- 授权状态卡片 -->
+            <div class="license-sidebar-card" id="licenseSidebarCard" onclick="openAuthModal()">
+                <div class="license-status-header">
+                    <span class="status-indicator-dot unverified" id="authIndicatorDot"></span>
+                    <span class="license-status-text" id="authBadgeText">检测授权中...</span>
+                </div>
+                <div class="license-days-hint" id="authDaysHint">点击输入卡密激活</div>
+            </div>
+
+            <!-- OCR 引擎状态 -->
+            <div class="engine-status-pill">
+                <span class="pulse-dot" id="ocrStatusDot"></span>
+                <span class="engine-name" id="ocrStatusText">检测 OCR 状态...</span>
             </div>
         </div>
     </aside>
 
-    <!-- 主内容 -->
-    <main class="main-content">
+    <!-- 主视口内容区 -->
+    <div class="content-wrapper">
+        <!-- 顶部综合状态导航栏 -->
+        <header class="top-navbar">
+            <div class="navbar-left">
+                <div class="page-breadcrumb">
+                    <span class="breadcrumb-item" id="currentPageTitle">单图极速识别</span>
+                </div>
+            </div>
 
-        <!-- ====== 页面1: 身份证识别 ====== -->
-        <div class="page active" id="page-recognize">
-            <h2 class="page-title"><span class="icon">📷</span> 身份证识别</h2>
+            <div class="navbar-right">
+                <!-- 机器码展示与一键复制 -->
+                <div class="hwid-pill" onclick="copyMachineCode()" title="点击复制机器码">
+                    <span class="hwid-icon">💻</span>
+                    <span class="hwid-label">本机硬件码:</span>
+                    <span class="hwid-code" id="topHwidCode">获取中...</span>
+                    <span class="copy-hint-tag">复制</span>
+                </div>
 
-            <div class="two-col">
-                <!-- 左侧: 上传 -->
-                <div>
-                    <div class="card">
-                        <div class="card-title">📤 上传身份证图片</div>
-                        <div class="upload-zone" id="uploadZone">
-                            <div class="upload-icon">🖼️</div>
-                            <div class="upload-text">拖拽图片到此处，或点击选择文件</div>
-                            <div class="upload-hint">支持正面和反面图片，可一次选择多张</div>
-                            <input type="file" id="fileInput" accept="image/*" multiple>
-                        </div>
-                        <div class="image-previews" id="imagePreviews">
-                            <div class="preview-slot" id="frontPreview">
-                                <div class="label">正面（人像面）</div>
-                                <div class="upload-hint">未选择</div>
-                                <button class="remove-btn" onclick="removeFront()">✕</button>
+                <!-- 授权激活按钮 -->
+                <button class="btn btn-auth-pill" id="topAuthBtn" onclick="openAuthModal()">
+                    <span class="auth-btn-icon">💎</span>
+                    <span id="topAuthBtnText">授权激活</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容页面容器 -->
+        <main class="main-content">
+
+            <!-- ====== 页面1: 身份证识别 ====== -->
+            <div class="page active" id="page-recognize">
+                <div class="two-col">
+                    <!-- 左侧: 上传面板 -->
+                    <div>
+                        <div class="card glass-card">
+                            <div class="card-title">
+                                <span class="title-icon">📤</span>
+                                <span>上传身份证图像</span>
                             </div>
-                            <div class="preview-slot" id="backPreview">
-                                <div class="label">反面（国徽面）</div>
-                                <div class="upload-hint">未选择（可选）</div>
-                                <button class="remove-btn" onclick="removeBack()">✕</button>
+                            <div class="upload-zone" id="uploadZone">
+                                <div class="upload-icon-wrapper">
+                                    <div class="upload-icon">🖼️</div>
+                                </div>
+                                <div class="upload-text">点击选择或直接将图片拖拽至此区域</div>
+                                <div class="upload-hint">支持 JPG / PNG / BMP，单张正反合图可自动拆分识别</div>
+                                <input type="file" id="fileInput" accept="image/*" multiple>
+                            </div>
+                            <div class="image-previews" id="imagePreviews">
+                                <div class="preview-slot" id="frontPreview">
+                                    <div class="label">正面（人像面）</div>
+                                    <div class="upload-hint">未选择</div>
+                                    <button class="remove-btn" onclick="removeFront()">✕</button>
+                                </div>
+                                <div class="preview-slot" id="backPreview">
+                                    <div class="label">反面（国徽面）</div>
+                                    <div class="upload-hint">未选择（可选）</div>
+                                    <button class="remove-btn" onclick="removeBack()">✕</button>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" id="btnRecognize" onclick="recognize()" disabled>
+                                    <span>🔍</span> 开始高精度识别
+                                </button>
                             </div>
                         </div>
-                        <div class="btn-group">
-                            <button class="btn btn-primary" id="btnRecognize" onclick="recognize()" disabled>
-                                <span>🔍</span> 开始识别
-                            </button>
+                    </div>
+
+                    <!-- 右侧: 数字化结果卡片 -->
+                    <div>
+                        <div class="card glass-card">
+                            <div class="card-title-row">
+                                <div class="card-title">
+                                    <span class="title-icon">📋</span>
+                                    <span>结构化识别结果</span>
+                                </div>
+                                <div class="card-actions">
+                                    <button class="btn-text" id="btnViewRawOcr" onclick="openRawOcrModal()" style="display:none;">
+                                        📜 原始文本
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="resultArea">
+                                <div class="empty-state">
+                                    <div class="empty-icon">📝</div>
+                                    <p class="empty-title">等待识别</p>
+                                    <p class="empty-desc">上传身份证正反面图片后点击“开始识别”即可提取数据</p>
+                                </div>
+                            </div>
+
+                            <div class="btn-group" id="resultActions" style="display:none;">
+                                <button class="btn btn-success" onclick="fillTemplate()">
+                                    <span>📝</span> 一键套打模板
+                                </button>
+                                <button class="btn btn-warning" onclick="exportSingleExcel()">
+                                    <span>📊</span> 追加导出 Excel
+                                </button>
+                            </div>
                         </div>
+
+                        <!-- 警告信息区域 -->
+                        <div id="warningArea"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== 页面2: 批量处理 ====== -->
+            <div class="page" id="page-batch">
+                <div class="card glass-card">
+                    <div class="card-title">
+                        <span class="title-icon">📂</span>
+                        <span>批量上传身份证相册</span>
+                    </div>
+                    <div class="upload-zone" id="batchUploadZone">
+                        <div class="upload-icon-wrapper">
+                            <div class="upload-icon">📁</div>
+                        </div>
+                        <div class="upload-text">支持批量拖入数十甚至数百张身份证图片</div>
+                        <div class="upload-hint">系统将智能识别同人文件（如“张三1”、“张三2”自动配对归组）</div>
+                        <input type="file" id="batchFileInput" accept="image/*" multiple>
                     </div>
                 </div>
 
-                <!-- 右侧: 结果 -->
-                <div>
-                    <div class="card">
-                        <div class="card-title">📋 识别结果</div>
-                        <div id="resultArea">
-                            <div class="empty-state">
-                                <div class="icon">📝</div>
-                                <p>上传身份证图片后点击识别</p>
-                            </div>
+                <!-- 分组预览 -->
+                <div class="card glass-card" id="batchGroupCard" style="display:none;">
+                    <div class="card-title-row">
+                        <div class="card-title">
+                            <span class="title-icon">👥</span>
+                            <span>智能配对分组结果</span>
                         </div>
-                        <div class="btn-group" id="resultActions" style="display:none;">
-                            <button class="btn btn-success" onclick="fillTemplate()">
-                                <span>📝</span> 填入模板
-                            </button>
-                            <button class="btn btn-warning" onclick="exportSingleExcel()">
+                        <div class="group-stats" id="batchGroupStats"></div>
+                    </div>
+
+                    <div id="groupPreview"></div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary btn-lg" id="btnBatchRecognize" onclick="batchRecognize()">
+                            <span>🚀</span> 启动批量高速识别
+                        </button>
+                    </div>
+                    <div class="progress-bar" id="batchProgress" style="display:none;">
+                        <div class="progress-fill" id="batchProgressFill"></div>
+                    </div>
+                </div>
+
+                <!-- 批量结果数据表 -->
+                <div class="card glass-card" id="batchResultCard" style="display:none;">
+                    <div class="card-title-row">
+                        <div class="card-title">
+                            <span class="title-icon">📋</span>
+                            <span>批量识别汇总清单</span>
+                        </div>
+                        <div class="table-actions-top">
+                            <button class="btn btn-sm btn-warning" onclick="exportBatchExcel()">
                                 <span>📊</span> 导出 Excel
                             </button>
+                            <button class="btn btn-sm btn-success" onclick="fillTemplateBatch()">
+                                <span>📝</span> 批量填入模板
+                            </button>
                         </div>
                     </div>
-                    <!-- 警告信息 -->
-                    <div id="warningArea"></div>
-                </div>
-            </div>
-        </div>
 
-        <!-- ====== 页面2: 批量处理 ====== -->
-        <div class="page" id="page-batch">
-            <h2 class="page-title"><span class="icon">📁</span> 批量处理</h2>
-
-            <div class="card">
-                <div class="card-title">📤 上传批量图片</div>
-                <div class="upload-zone" id="batchUploadZone">
-                    <div class="upload-icon">📂</div>
-                    <div class="upload-text">拖拽或选择多张身份证图片</div>
-                    <div class="upload-hint">系统将自动按文件名分组（如"张三1"、"张三2"归为一组）</div>
-                    <input type="file" id="batchFileInput" accept="image/*" multiple>
-                </div>
-            </div>
-
-            <!-- 分组预览 -->
-            <div class="card" id="batchGroupCard" style="display:none;">
-                <div class="card-title">👥 分组预览</div>
-                <div id="groupPreview"></div>
-                <div class="btn-group">
-                    <button class="btn btn-primary" id="btnBatchRecognize" onclick="batchRecognize()">
-                        <span>🚀</span> 开始批量识别
-                    </button>
-                </div>
-                <div class="progress-bar" id="batchProgress" style="display:none;">
-                    <div class="progress-fill" id="batchProgressFill"></div>
-                </div>
-            </div>
-
-            <!-- 批量结果 -->
-            <div class="card" id="batchResultCard" style="display:none;">
-                <div class="card-title">📋 批量识别结果</div>
-                <div style="overflow-x: auto;">
-                    <table class="data-table" id="batchResultTable">
-                        <thead>
-                            <tr>
-                                <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                                <th>姓名</th>
-                                <th>性别</th>
-                                <th>民族</th>
-                                <th>出生日期</th>
-                                <th>年龄</th>
-                                <th>身份证号码</th>
-                                <th>住址</th>
-                                <th>签发机关</th>
-                                <th>有效期限</th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchResultBody"></tbody>
-                    </table>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-warning" onclick="exportBatchExcel()">
-                        <span>📊</span> 导出选中到 Excel
-                    </button>
-                    <button class="btn btn-success" onclick="fillTemplateBatch()">
-                        <span>📝</span> 批量填入模板
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ====== 页面3: 模板管理 ====== -->
-        <div class="page" id="page-templates">
-            <h2 class="page-title"><span class="icon">📄</span> 模板管理</h2>
-
-            <div class="two-col">
-                <div>
-                    <div class="card">
-                        <div class="card-title">📤 上传模板</div>
-                        <div class="upload-zone" id="templateUploadZone">
-                            <div class="upload-icon">📎</div>
-                            <div class="upload-text">拖拽或选择模板文件</div>
-                            <div class="upload-hint">支持 .docx（Word）和 .xlsx（Excel）格式</div>
-                            <input type="file" id="templateFileInput" accept=".docx,.xlsx">
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">🏷️ 可用占位符</div>
-                        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
-                            在模板中使用以下占位符，识别后将自动替换为实际值：
-                        </p>
-                        <div class="placeholder-list">
-                            <span class="placeholder-tag">{% raw %}{{姓名}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{性别}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{民族}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{出生日期}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{年龄}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{身份证号码}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{住址}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{签发机关}}{% endraw %}</span>
-                            <span class="placeholder-tag">{% raw %}{{有效期限}}{% endraw %}</span>
-                        </div>
+                    <div class="table-responsive-wrapper">
+                        <table class="data-table" id="batchResultTable">
+                            <thead>
+                                <tr>
+                                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                    <th>姓名</th>
+                                    <th>性别</th>
+                                    <th>民族</th>
+                                    <th>出生日期</th>
+                                    <th>年龄</th>
+                                    <th>公民身份号码</th>
+                                    <th>住址</th>
+                                    <th>签发机关</th>
+                                    <th>有效期限</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batchResultBody"></tbody>
+                        </table>
                     </div>
                 </div>
-                <div>
-                    <div class="card">
-                        <div class="card-title">📑 已上传模板</div>
-                        <div id="templateList">
-                            <div class="empty-state">
-                                <div class="icon">📄</div>
-                                <p>暂无模板，请上传</p>
+            </div>
+
+            <!-- ====== 页面3: 模板管理 ====== -->
+            <div class="page" id="page-templates">
+                <div class="two-col">
+                    <div>
+                        <div class="card glass-card">
+                            <div class="card-title">
+                                <span class="title-icon">📎</span>
+                                <span>添加套打模板</span>
+                            </div>
+                            <div class="upload-zone" id="templateUploadZone">
+                                <div class="upload-icon-wrapper">
+                                    <div class="upload-icon">📄</div>
+                                </div>
+                                <div class="upload-text">点击或拖拽上传 Word 或 Excel 模板</div>
+                                <div class="upload-hint">支持 .docx 及 .xlsx 格式模板文件</div>
+                                <input type="file" id="templateFileInput" accept=".docx,.xlsx">
+                            </div>
+                        </div>
+
+                        <div class="card glass-card">
+                            <div class="card-title">
+                                <span class="title-icon">🏷️</span>
+                                <span>模板占位符对照指南</span>
+                            </div>
+                            <p class="placeholder-intro">
+                                请在您的 Word 或 Excel 模板中插入以下双花括号占位符，生成时将精准替换为对应文本：
+                            </p>
+                            <div class="placeholder-list">
+                                <span class="placeholder-tag" onclick="copyTag('{{姓名}}')">{% raw %}{{姓名}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{性别}}')">{% raw %}{{性别}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{民族}}')">{% raw %}{{民族}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{出生日期}}')">{% raw %}{{出生日期}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{年龄}}')">{% raw %}{{年龄}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{身份证号码}}')">{% raw %}{{身份证号码}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{住址}}')">{% raw %}{{住址}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{签发机关}}')">{% raw %}{{签发机关}}{% endraw %}</span>
+                                <span class="placeholder-tag" onclick="copyTag('{{有效期限}}')">{% raw %}{{有效期限}}{% endraw %}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="card glass-card">
+                            <div class="card-title">
+                                <span class="title-icon">📑</span>
+                                <span>本地已存模板库</span>
+                            </div>
+                            <div id="templateList">
+                                <div class="empty-state">
+                                    <div class="empty-icon">📄</div>
+                                    <p class="empty-title">模板库为空</p>
+                                    <p class="empty-desc">请在左侧上传您的常备表格或合同模板</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- ====== 页面4: 数据导出 ====== -->
-        <div class="page" id="page-export">
-            <h2 class="page-title"><span class="icon">📊</span> 数据导出</h2>
+            <!-- ====== 页面4: 数据导出 ====== -->
+            <div class="page" id="page-export">
+                <div class="card glass-card">
+                    <div class="card-title-row">
+                        <div class="card-title">
+                            <span class="title-icon">📊</span>
+                            <span>本次运行提取台账</span>
+                        </div>
+                        <div class="btn-group" id="exportActions" style="display:none; margin:0;">
+                            <button class="btn btn-sm btn-warning" onclick="exportSelectedHistory()">
+                                <span>📊</span> 导出选中到 Excel
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="fillTemplateFromHistory()">
+                                <span>📝</span> 选中套打模板
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="clearHistory()">
+                                <span>🗑️</span> 清空台账
+                            </button>
+                        </div>
+                    </div>
 
-            <div class="card">
-                <div class="card-title">📋 识别历史记录</div>
-                <div id="historyArea">
-                    <div class="empty-state">
-                        <div class="icon">📭</div>
-                        <p>暂无识别记录</p>
+                    <div id="historyArea">
+                        <div class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <p class="empty-title">暂无台账记录</p>
+                            <p class="empty-desc">完成识别操作后，数据将自动归档至此供集中查验与导出</p>
+                        </div>
                     </div>
                 </div>
-                <div class="btn-group" id="exportActions" style="display:none;">
-                    <button class="btn btn-warning" onclick="exportSelectedHistory()">
-                        <span>📊</span> 导出选中到 Excel
-                    </button>
-                    <button class="btn btn-success" onclick="fillTemplateFromHistory()">
-                        <span>📝</span> 选中填入模板
-                    </button>
-                    <button class="btn btn-danger" onclick="clearHistory()">
-                        <span>🗑️</span> 清空历史
-                    </button>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- ================= 商业授权激活弹窗 (Modal) ================= -->
+<div class="auth-modal-overlay" id="authModal" style="display:none;">
+    <div class="auth-modal-card">
+        <button class="modal-close-btn" onclick="closeAuthModal()">✕</button>
+
+        <div class="auth-header">
+            <div class="auth-logo-badge">💎</div>
+            <h2 class="auth-title">产品授权中心</h2>
+            <p class="auth-subtitle">身份证OCR · 商业标准核心版</p>
+        </div>
+
+        <div class="auth-body">
+            <!-- 硬件指纹栏 -->
+            <div class="auth-section">
+                <label class="auth-label">本机硬件特征码 (机器码)：</label>
+                <div class="hwid-copy-box">
+                    <input type="text" id="modalMachineCode" class="hwid-input" readonly value="获取中...">
+                    <button class="btn btn-copy" onclick="copyModalHwid()">📋 一键复制</button>
+                </div>
+                <div class="auth-tip-text">请将上方机器码发送给闲鱼卖家，获取专属卡密激活码</div>
+            </div>
+
+            <!-- 卡密输入栏 -->
+            <div class="auth-section">
+                <label class="auth-label">16位激活卡密：</label>
+                <input type="text" id="authCodeInput" class="auth-code-input" placeholder="例如: ABCD-1234-EFGH-5678" maxlength="32">
+            </div>
+
+            <!-- 当前授权卡片 -->
+            <div class="license-info-card" id="licenseInfoCard">
+                <div class="info-row">
+                    <span class="info-label">授权状态:</span>
+                    <span class="info-val" id="licInfoStatus">未激活</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">绑定硬件:</span>
+                    <span class="info-val" id="licInfoHwid">一机一码</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">有效期限:</span>
+                    <span class="info-val" id="licInfoExpire">永久有效</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">功能模块:</span>
+                    <span class="info-val badge-feature" id="licInfoFeature">standard 基础核心</span>
                 </div>
             </div>
         </div>
 
-    </main>
+        <div class="auth-footer">
+            <button class="btn btn-primary btn-block btn-lg" id="btnDoActivate" onclick="submitActivation()">
+                <span>⚡</span> 立即联网验证激活
+            </button>
+            <div class="auth-sub-actions">
+                <button class="btn-link" onclick="submitUnbind()">换机解绑当前授权</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- 加载遮罩 -->
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner-large"></div>
-    <div class="loading-text" id="loadingText">正在识别中...</div>
+    <div class="loading-text" id="loadingText">正在处理中...</div>
 </div>
 
 <!-- Toast 容器 -->
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- 模板选择弹窗 -->
-<div class="loading-overlay" id="templateModal" style="display:none;">
-    <div class="card" style="max-width: 400px; width: 90%;">
-        <div class="card-title">选择模板</div>
-        <div id="templateSelectList"></div>
-        <div class="btn-group" style="justify-content: flex-end;">
+<div class="auth-modal-overlay" id="templateModal" style="display:none;">
+    <div class="card glass-card modal-compact" style="max-width: 440px; width: 90%;">
+        <div class="card-title">
+            <span>📝</span> 选择套打模板
+        </div>
+        <div id="templateSelectList" class="template-select-container"></div>
+        <div class="btn-group" style="justify-content: flex-end; margin-top: 16px;">
             <button class="btn btn-outline" onclick="closeTemplateModal()">取消</button>
         </div>
     </div>
 </div>
 
-<!-- 原始 OCR 内容弹窗 -->
-<div class="loading-overlay" id="rawOcrModal" style="display:none;">
-    <div class="card raw-ocr-card">
-        <div class="card-title">📜 原始 OCR 识别内容</div>
-        <div class="raw-ocr-hint">以下为 OCR 识别的原始文本，每行一条。您可以手动编辑后点击"重新解析"更新结果。</div>
+<!-- 原始 OCR 内容编辑弹窗 -->
+<div class="auth-modal-overlay" id="rawOcrModal" style="display:none;">
+    <div class="card glass-card raw-ocr-card">
+        <div class="card-title">
+            <span>📜</span> 原始 OCR 识别文本对比核对
+        </div>
+        <div class="raw-ocr-hint">
+            下方为底层引擎提取的纯文本流。若发现错字，可在此手动修改后点击“重新解析”立即更新结果。
+        </div>
         <div class="raw-ocr-body">
             <div class="raw-ocr-section">
-                <label>正面（人像面）文本：</label>
-                <textarea id="rawOcrFront" rows="8" placeholder="无正面 OCR 文本"></textarea>
+                <label>正面（人像面）文本行：</label>
+                <textarea id="rawOcrFront" rows="8" placeholder="未提取到正面 OCR 文本"></textarea>
             </div>
             <div class="raw-ocr-section">
-                <label>反面（国徽面）文本：</label>
-                <textarea id="rawOcrBack" rows="5" placeholder="无反面 OCR 文本"></textarea>
+                <label>反面（国徽面）文本行：</label>
+                <textarea id="rawOcrBack" rows="5" placeholder="未提取到反面 OCR 文本"></textarea>
             </div>
         </div>
         <div class="btn-group" style="justify-content: flex-end;">
             <button class="btn btn-primary" onclick="reparseFromModal()">
-                <span>🔄</span> 重新解析
+                <span>🔄</span> 重新提取解析
             </button>
             <button class="btn btn-outline" onclick="closeRawOcrModal()">关闭</button>
         </div>

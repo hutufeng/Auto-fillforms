@@ -3,3 +3,8 @@ requests
 openpyxl
 docxtpl
 pillow
+cryptography>=41.0.0
+
+# 可选推荐增强项 (桌面原生无黑框体验 & 内置纯离线零依赖 OCR)
+# pip install pywebview rapidocr-onnxruntime pyinstaller
+
