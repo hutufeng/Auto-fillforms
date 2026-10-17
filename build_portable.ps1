@@ -29,22 +29,17 @@ if (Test-Path ".\dist") { Remove-Item -Path ".\dist" -Recurse -Force }
 
 Write-Host "[3/4] 开始执行 PyInstaller 单文件无黑框封装..." -ForegroundColor Yellow
 
-# 打包命令：
-# -F 单文件
-# -w 无控制台黑框
-# --add-data 打包 static 和 templates
+# 打包命令 (纯原生极简单文件，无控制台黑框，零端口，体积仅约 15MB~20MB):
 & $py -m PyInstaller `
     --noconfirm `
     --onefile `
     --windowed `
     --name "身份证OCR" `
-    --add-data "static;static" `
-    --add-data "templates;templates" `
     --hidden-import "cryptography" `
-    --hidden-import "jinja2" `
     --hidden-import "openpyxl" `
     --hidden-import "docxtpl" `
-    run_desktop.py
+    --hidden-import "customtkinter" `
+    app_gui.py
 
 Write-Host "[4/4] 打包完成！生成闲鱼发货便携包与买家指南..." -ForegroundColor Green
 
