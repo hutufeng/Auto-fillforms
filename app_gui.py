@@ -416,6 +416,17 @@ class AppGUI(ctk.CTk if USE_CTK else tk.Tk):
                 front_lines = ocr_image(self.front_path) if self.front_path else []
                 back_lines = ocr_image(self.back_path) if self.back_path else []
 
+                if not front_lines and not back_lines:
+                    if not check_ocr_service():
+                        self.after(0, lambda: messagebox.showerror(
+                            "OCR引擎未就绪",
+                            "当前未检测到可用的 OCR 识别引擎！\n\n【解决方案】\n请在终端执行安装内置离线引擎（开箱即用）：\npip install rapidocr-onnxruntime\n\n或启动本地 UMI-OCR 外部服务 (127.0.0.1:1224)。"
+                        ))
+                    else:
+                        self.after(0, lambda: messagebox.showwarning("提示", "未能从图片中识别到身份证文字，请确认图片清晰、平整且无严重遮挡。"))
+                    self.after(0, lambda: self.btn_run_ocr.configure(state="normal", text="🔍 开始高精度提取识别"))
+                    return
+
                 # 单图正反面合图拆分判断
                 if self.front_path and not self.back_path and front_lines:
                     data, side = parse_single_image(front_lines)
@@ -426,9 +437,12 @@ class AppGUI(ctk.CTk if USE_CTK else tk.Tk):
 
                 # UI 填充
                 def _update():
+                    has_any = False
                     for k, entry in self.form_entries.items():
                         entry.delete(0, "end")
                         val = data.get(k, "")
+                        if val:
+                            has_any = True
                         entry.insert(0, str(val))
 
                     # 告警
@@ -439,7 +453,10 @@ class AppGUI(ctk.CTk if USE_CTK else tk.Tk):
                         self.warn_lbl.configure(text="")
 
                     self.btn_run_ocr.configure(state="normal", text="🔍 开始高精度提取识别")
-                    messagebox.showinfo("完成", "身份证信息提取完成！")
+                    if has_any:
+                        messagebox.showinfo("完成", "身份证信息提取完成！")
+                    else:
+                        messagebox.showwarning("提示", "未提取到有效身份证字段，请检查图片内容是否清晰。")
 
                 self.after(0, _update)
             except Exception as e:
