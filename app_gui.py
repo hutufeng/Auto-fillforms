@@ -74,7 +74,7 @@ class AppGUI(ctk.CTk if USE_CTK else tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("身份证信息提取与卡面扫描系统")
+        self.title("身份证智能录入与扫描助手")
         self._init_window_geometry()
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
 

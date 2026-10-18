@@ -10,12 +10,12 @@ on:
       release_title:
         description: "Release 标题"
         required: false
-        default: "身份证OCR 商业标准版"
+        default: "身份证智能录入与扫描助手"
       release_notes:
         description: "更新说明 (Markdown 格式)"
         required: false
         default: |
-          ### 🚀 身份证OCR 客户端发布
+          ### 🚀 身份证智能录入与扫描助手 发布
           - 📷 支持单张/正反合图高精度秒级识别与精准切片
           - 📁 支持多图片批量导入并按人名智能配对
           - 🖨️ A4 扫描件高保真生成（彩色/黑白）与防盗用水印
@@ -53,7 +53,7 @@ jobs:
             --noconfirm `
             --onefile `
             --windowed `
-            --name "身份证OCR" `
+            --name "身份证智能录入与扫描助手" `
             --icon "assets\icon.ico" `
             --add-data "assets;assets" `
             --hidden-import "cryptography" `
@@ -67,24 +67,26 @@ jobs:
             --collect-all "rapidocr_onnxruntime" `
             app_gui.py
 
-      - name: 生成买家使用指南并打包发布包
+      - name: 生成配套使用指南并打包发布包
         shell: pwsh
         run: |
           $GuideContent = @"
           ======================================================================
-               🪪 身份证智能识别与 A4 扫描件管理系统 · 使用与激活指南
+                        身份证智能录入与扫描助手 · 使用指南
           ======================================================================
 
-          感谢您购买本软件！本软件为纯绿色免安装单文件版，无需安装 Python 或任何复杂环境，
-          解压后双击即可运行。数据完全在您本地离线处理，100% 保护隐私安全。
+          【软件概述】
+          本软件为纯绿色免安装版，无需配置 Python 环境，解压即用。
+          所有图像处理与 OCR 识别均在本地离线完成，无网络数据外发。
 
           ----------------------------------------------------------------------
-          一、首次使用与激活步骤（仅需 1 分钟）
+          一、首次运行与授权激活
           ----------------------------------------------------------------------
-          1. 双击运行当前目录下的【身份证OCR.exe】。
-          2. 首次启动软件会自动弹出授权窗口，点击【一键复制机器码】。
-          3. 将机器码发送给闲鱼卖家，卖家核验后将为您发放 16 位专属激活卡密。
-          4. 将卡密粘贴到软件输入框中，点击【立即联网验证激活】，即可永久解锁核心功能！
+          1. 双击运行【身份证智能录入与扫描助手.exe】。
+          2. 首次启动将弹出激活窗口，点击【一键复制机器码】。
+          3. 将机器码发送给授权管理员，获取 16 位激活卡密。
+          4. 粘贴卡密并点击【立即联网验证激活】（仅激活时需连接网络验证 1 秒）。
+          5. 激活完成后即可完全离线使用。
 
           ----------------------------------------------------------------------
           二、主要核心功能使用指引
@@ -103,15 +105,19 @@ jobs:
           3. Word / Excel 模板智能套打：
              - 在模板中使用 {{姓名}}、{{身份证号码}}、{{avatar}} (自动插入头像) 等占位符，一键批量填充生成独立文档。
 
-          祝您使用愉快！如有疑问请随时联系闲鱼卖家。
+          ----------------------------------------------------------------------
+          三、注意事项
+          ----------------------------------------------------------------------
+          1. 照片建议平放清晰拍摄，避免反光或强烈阴影遮挡关键文字。
+          2. 如需更换电脑运行，请使用软件内置的【换机解绑】功能。
           ======================================================================
           "@
           
-          $GuidePath = ".\dist\使用与激活指南.txt"
+          $GuidePath = ".\dist\使用指南.txt"
           [System.IO.File]::WriteAllText($GuidePath, $GuideContent, [System.Text.Encoding]::UTF8)
 
           $tag = "${{ github.event.inputs.tag_name }}"
-          $zipName = "IDCard_OCR_${tag}_Windows_x64.zip"
+          $zipName = "IDCard_Assistant_${tag}_Windows_x64.zip"
 
           # 将 dist 目录打包为便携绿色 ZIP
           Compress-Archive -Path ".\dist\*" -DestinationPath ".\$zipName" -Force
@@ -124,8 +130,8 @@ jobs:
           name: "${{ github.event.inputs.release_title }} (${{ github.event.inputs.tag_name }})"
           body: ${{ github.event.inputs.release_notes }}
           files: |
-            IDCard_OCR_${{ github.event.inputs.tag_name }}_Windows_x64.zip
-            dist/身份证OCR.exe
+            IDCard_Assistant_${{ github.event.inputs.tag_name }}_Windows_x64.zip
+            dist/身份证智能录入与扫描助手.exe
           draft: false
           prerelease: false
         env:

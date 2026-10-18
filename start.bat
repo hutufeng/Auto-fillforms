@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title ID Card OCR and Form Filler Pro
+title 身份证智能录入与扫描助手
 
 set PYTHON_CMD=
 
