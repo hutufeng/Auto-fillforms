@@ -82,26 +82,28 @@ python app.py
 
 ```
 Auto-fillforms/
-├── app.py                 # Flask 主应用
-├── config.py              # 全局配置
-├── ocr_client.py          # UMI-OCR HTTP 调用
-├── id_parser.py           # OCR 文本 → 结构化数据
-├── id_calculator.py       # 身份证号 → 生日/年龄/性别
-├── excel_writer.py        # Excel 写入（追加模式）
-├── template_filler.py     # Word/Excel 模板填充
-├── batch_processor.py     # 批量处理 + 文件名分组
-├── requirements.txt
-├── static/css/style.css   # 暗色主题样式
-├── static/js/app.js       # 前端交互逻辑
-├── templates/index.html   # 单页 HTML
-├── user_templates/        # 用户上传的模板
-├── uploads/               # 上传图片（临时）
-└── output/                # 导出文件
+├── run_desktop.py         # 原生桌面程序快速启动入口
+├── app_gui.py             # 现代化 CustomTkinter 响应式桌面主工作台
+├── local_ocr.py           # 内置纯本地 RapidOCR 离线推理引擎
+├── id_scanner.py          # 二代证边缘检测、倾斜纠偏、切片与A4扫描件生成
+├── id_parser.py           # OCR 文本 → 结构化二代证 9 大字段解析
+├── id_calculator.py       # 身份证号 → 生日/周岁/性别/校验码计算
+├── id_cropper.py          # 免冠头像提取与系统剪贴板通道
+├── excel_writer.py        # Excel 台账导出（实时追加）
+├── template_filler.py     # Word/Excel 模板填充（文字+照片）
+├── batch_processor.py     # 批量处理、文件名分组与多页/单页PDF解析
+├── auth_manager.py        # 商业授权与在线换机解绑 SDK
+├── build_portable.ps1     # 单文件便携版一键打包脚本
+├── requirements.txt       # 纯本地依赖清单
+├── user_templates/        # 套打模板目录
+├── uploads/               # 临时解析缓存
+└── output/                # 导出卡片、头像、A4扫描件与套打成果
 ```
 
-## ⚠️ 注意事项
+## 💡 运行与使用
 
-- 需先启动 UMI-OCR 并确保 HTTP 服务可用
+- **原生桌面版（推荐）**：直接运行 `start.bat` 或执行 `python run_desktop.py`
+- **无需外部 OCR 软件**：内置 RapidOCR-ONNX 纯本地推理，断网脱机即开即用
 - 身份证图片建议正拍、清晰，避免严重倾斜或反光
 - 性别由身份证号第 17 位计算（奇=男，偶=女），不依赖 OCR 文本
 - 身份证号末位 X 自动统一为大写

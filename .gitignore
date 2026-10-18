@@ -17,6 +17,7 @@ venv/
 # 运行时生成目录
 uploads/
 output/
+scratch/
 
 # IDE
 .vscode/
@@ -39,3 +40,4 @@ user_templates/*.xlsx
 *.lic.token
 license.lic
 license.lic.token
+window_config.json

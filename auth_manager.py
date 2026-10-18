@@ -156,6 +156,21 @@ class AuthManager:
         self.product_id = PRODUCT_ID
         self.server_url = SERVER_URL
         self.required_feature = REQUIRED_FEATURE
+        self.license_file = LICENSE_FILE
+        self.token_file = TOKEN_FILE
+
+    def read_license_file(self) -> dict:
+        """读取并解析本地 license.lic 文件为字典"""
+        if not os.path.exists(LICENSE_FILE):
+            return {}
+        try:
+            with open(LICENSE_FILE, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    return json.loads(content)
+        except Exception:
+            pass
+        return {}
 
     def get_token(self) -> str:
         if os.path.exists(TOKEN_FILE):
@@ -313,18 +328,34 @@ class AuthManager:
         except Exception as e:
             return False, f"无法连接认证服务器: {str(e)}"
 
-    def unbind_online(self, auth_code: str) -> tuple[bool, str]:
-        """换机解绑"""
-        code = auth_code.strip()
-        if not code:
-            return False, "请输入原激活码以进行解绑"
+    def unbind_online(self, identifier: str = "") -> tuple[bool, str]:
+        """
+        在线向服务端请求解除当前电脑的绑定 (换机解绑) 并清除本地凭证。
+        根据 SDK 规范与服务端 API 契约 (/api/v1/unbind)：
+        1. 请求头携带 Authorization: Bearer <token> (若本地存在伴随凭证)
+        2. 请求体包含:
+           - auth_code: 传入激活码、或从本地证书读取的 license_id、或硬件码
+           - machine_code: 本机标准硬件码
+           - platform: "Windows"
+        3. 服务端核验通过并释放席位后，安全删除本地 license.lic 和 license.lic.token
+        """
+        ident = identifier.strip()
+        lic_data = self.read_license_file()
+        lic_id = lic_data.get("license_id", "")
+        token = self.get_token()
+
+        # 智能匹配解绑凭据：若用户未显式输入，优先使用本地许可证编号，次选硬件码
+        effective_code = ident or lic_id or self.machine_code
 
         payload = {
-            "auth_code": code,
-            "machine_code": self.machine_code
+            "auth_code": effective_code,
+            "machine_code": self.machine_code,
+            "platform": "Windows"
         }
-        headers = {"Content-Type": "application/json"}
-        token = self.get_token()
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "HutuClientPython/1.0"
+        }
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
@@ -335,17 +366,28 @@ class AuthManager:
                 headers=headers,
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 if data.get("code") == 0:
                     for p in [LICENSE_FILE, TOKEN_FILE]:
                         if os.path.exists(p):
-                            try: os.remove(p)
-                            except: pass
-                    return True, "解绑成功，已恢复未激活状态"
-                return False, data.get("message", "解绑失败")
+                            try:
+                                os.remove(p)
+                            except Exception:
+                                pass
+                    server_msg = data.get("message") or "设备换机解绑成功"
+                    return True, f"{server_msg}！授权配额已释放，可在新电脑上重新激活。"
+                return False, data.get("message", "解绑请求被服务器拒绝")
+        except urllib.error.HTTPError as he:
+            try:
+                raw_body = he.read().decode('utf-8', errors='replace')
+                err_data = json.loads(raw_body)
+                msg = err_data.get("message") or err_data.get("error") or f"HTTP {he.code}"
+                return False, f"解绑被拒绝: {msg}"
+            except Exception:
+                return False, f"解绑请求失败: HTTP {he.code}"
         except Exception as e:
-            return False, f"解绑异常: {str(e)}"
+            return False, f"无法连接认证服务器: {str(e)}"
 
 
 # 单例实例

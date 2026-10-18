@@ -5,10 +5,6 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# UMI-OCR 服务
-OCR_API_URL = os.getenv("OCR_API_URL", "http://127.0.0.1:1224/api/ocr")
-OCR_TIMEOUT = int(os.getenv("OCR_TIMEOUT", "30"))  # 秒
-
 # 运行参数
 MAX_HISTORY_SIZE = int(os.getenv("MAX_HISTORY_SIZE", "200"))
 

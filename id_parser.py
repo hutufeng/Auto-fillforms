@@ -156,6 +156,8 @@ def parse_front(lines: list[str]) -> dict:
     return result
 
 
+
+
 def parse_back(lines: list[str]) -> dict:
     """
     解析身份证反面（国徽面）OCR 文本。

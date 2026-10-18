@@ -35,10 +35,17 @@ Write-Host "[3/4] 开始执行 PyInstaller 单文件无黑框封装..." -Foregro
     --onefile `
     --windowed `
     --name "身份证OCR" `
+    --icon "assets\icon.ico" `
+    --add-data "assets;assets" `
     --hidden-import "cryptography" `
     --hidden-import "openpyxl" `
     --hidden-import "docxtpl" `
     --hidden-import "customtkinter" `
+    --hidden-import "cv2" `
+    --hidden-import "pymupdf" `
+    --hidden-import "fitz" `
+    --collect-all "customtkinter" `
+    --collect-all "rapidocr_onnxruntime" `
     app_gui.py
 
 Write-Host "[4/4] 打包完成！生成闲鱼发货便携包与买家指南..." -ForegroundColor Green

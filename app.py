@@ -12,7 +12,7 @@ from config import (
     UPLOAD_DIR, OUTPUT_DIR, USER_TEMPLATES_DIR, SUPPORTED_IMAGE_EXTS,
     MAX_HISTORY_SIZE
 )
-from ocr_client import check_ocr_service, ocr_image, get_ocr_engine_name
+from local_ocr import check_ocr_service, ocr_image, get_ocr_engine_name
 from id_parser import parse_single_image, parse_id_card, is_front_side, is_back_side
 from id_calculator import validate_id
 from excel_writer import write_to_excel, write_batch_to_excel
