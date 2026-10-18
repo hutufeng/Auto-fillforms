@@ -45,13 +45,13 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller pywebview
 
-      - name: 执行 PyInstaller 单文件编译封装
+      - name: 执行 PyInstaller 绿色免安装版编译封装 (秒级极速冷启动)
         shell: pwsh
         run: |
-          Write-Host "开始执行 PyInstaller 封装..." -ForegroundColor Cyan
+          Write-Host "开始执行 PyInstaller 绿色免安装版封装..." -ForegroundColor Cyan
           python -m PyInstaller `
             --noconfirm `
-            --onefile `
+            --onedir `
             --windowed `
             --name "身份证智能录入与扫描助手" `
             --icon "assets\icon.ico" `
@@ -67,9 +67,11 @@ jobs:
             --collect-all "rapidocr_onnxruntime" `
             app_gui.py
 
-      - name: 生成配套使用指南并打包发布包
+      - name: 生成配套使用指南并归档为便携 ZIP
         shell: pwsh
         run: |
+          $AppDir = ".\dist\身份证智能录入与扫描助手"
+
           $GuideContent = @"
           ======================================================================
                         身份证智能录入与扫描助手 · 使用指南
@@ -82,7 +84,7 @@ jobs:
           ----------------------------------------------------------------------
           一、首次运行与授权激活
           ----------------------------------------------------------------------
-          1. 双击运行【身份证智能录入与扫描助手.exe】。
+          1. 双击运行当前目录下的【身份证智能录入与扫描助手.exe】。
           2. 首次启动将弹出激活窗口，点击【一键复制机器码】。
           3. 将机器码发送给授权管理员，获取 16 位激活卡密。
           4. 粘贴卡密并点击【立即联网验证激活】（仅激活时需连接网络验证 1 秒）。
@@ -113,15 +115,15 @@ jobs:
           ======================================================================
           "@
           
-          $GuidePath = ".\dist\使用指南.txt"
+          $GuidePath = "$AppDir\使用指南.txt"
           [System.IO.File]::WriteAllText($GuidePath, $GuideContent, [System.Text.Encoding]::UTF8)
 
           $tag = "${{ github.event.inputs.tag_name }}"
-          $zipName = "IDCard_Assistant_${tag}_Windows_x64.zip"
+          $zipName = "IDCard_Assistant_${tag}_Windows_x64_Portable.zip"
 
-          # 将 dist 目录打包为便携绿色 ZIP
-          Compress-Archive -Path ".\dist\*" -DestinationPath ".\$zipName" -Force
-          Write-Host "便携包打包完成: $zipName" -ForegroundColor Green
+          # 将整个绿色免安装文件夹打包为便携 ZIP
+          Compress-Archive -Path $AppDir -DestinationPath ".\$zipName" -Force
+          Write-Host "绿色便携包打包完成: $zipName" -ForegroundColor Green
 
       - name: 发布至 GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -130,8 +132,7 @@ jobs:
           name: "${{ github.event.inputs.release_title }} (${{ github.event.inputs.tag_name }})"
           body: ${{ github.event.inputs.release_notes }}
           files: |
-            IDCard_Assistant_${{ github.event.inputs.tag_name }}_Windows_x64.zip
-            dist/身份证智能录入与扫描助手.exe
+            IDCard_Assistant_${{ github.event.inputs.tag_name }}_Windows_x64_Portable.zip
           draft: false
           prerelease: false
         env:

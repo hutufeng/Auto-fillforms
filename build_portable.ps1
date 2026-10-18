@@ -27,12 +27,12 @@ Write-Host "[2/4] 检查打包必备工具 (PyInstaller)..." -ForegroundColor Ye
 if (Test-Path ".\build") { Remove-Item -Path ".\build" -Recurse -Force }
 if (Test-Path ".\dist") { Remove-Item -Path ".\dist" -Recurse -Force }
 
-Write-Host "[3/4] 开始执行 PyInstaller 单文件无黑框封装..." -ForegroundColor Yellow
+Write-Host "[3/4] 开始执行 PyInstaller 绿色免安装版封装 (秒级极速冷启动)..." -ForegroundColor Yellow
 
-# 打包命令 (纯原生极简单文件，无控制台黑框，零端口):
+# 打包命令 (绿色便携目录模式，无黑框，无需每次启动临时解压 120MB，实现毫秒级秒开):
 & $py -m PyInstaller `
     --noconfirm `
-    --onefile `
+    --onedir `
     --windowed `
     --name "身份证智能录入与扫描助手" `
     --icon "assets\icon.ico" `
@@ -48,9 +48,11 @@ Write-Host "[3/4] 开始执行 PyInstaller 单文件无黑框封装..." -Foregro
     --collect-all "rapidocr_onnxruntime" `
     app_gui.py
 
-Write-Host "[4/4] 打包完成！生成配套使用指南..." -ForegroundColor Green
+Write-Host "[4/4] 打包完成！生成配套使用指南并归档为便携 ZIP..." -ForegroundColor Green
 
-# 生成配套说明书 (客观无营销纯使用指南)
+$AppDir = ".\dist\身份证智能录入与扫描助手"
+
+# 生成配套说明书至绿色应用文件夹根目录
 $GuideContent = @"
 ======================================================================
               身份证智能录入与扫描助手 · 使用指南
@@ -63,7 +65,7 @@ $GuideContent = @"
 ----------------------------------------------------------------------
 一、首次运行与授权激活
 ----------------------------------------------------------------------
-1. 双击运行【身份证智能录入与扫描助手.exe】。
+1. 双击运行当前目录下的【身份证智能录入与扫描助手.exe】。
 2. 首次启动将弹出激活窗口，点击【一键复制机器码】。
 3. 将机器码发送给授权管理员，获取 16 位激活卡密。
 4. 粘贴卡密并点击【立即联网验证激活】（仅激活时需连接网络验证 1 秒）。
@@ -125,10 +127,15 @@ $GuideContent = @"
 ======================================================================
 "@
 
-$GuidePath = ".\dist\使用指南.txt"
+$GuidePath = "$AppDir\使用指南.txt"
 [System.IO.File]::WriteAllText($GuidePath, $GuideContent, [System.Text.Encoding]::UTF8)
 
+# 压缩为独立便携分发包
+$ZipOut = ".\dist\身份证智能录入与扫描助手_绿色便携版.zip"
+if (Test-Path $ZipOut) { Remove-Item $ZipOut -Force }
+Compress-Archive -Path $AppDir -DestinationPath $ZipOut -Force
+
 Write-Host "`n✅ 构建成果已存放于 dist/ 目录：" -ForegroundColor Cyan
-Write-Host "   📁 dist\身份证智能录入与扫描助手.exe (单文件独立运行主程序)" -ForegroundColor Green
-Write-Host "   📄 dist\使用指南.txt                (用户操作指南)" -ForegroundColor Green
+Write-Host "   📁 dist\身份证智能录入与扫描助手\   (绿色免安装程序文件夹，秒级启动)" -ForegroundColor Green
+Write-Host "   📦 dist\身份证智能录入与扫描助手_绿色便携版.zip (买家开箱即用压缩包)" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
