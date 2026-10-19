@@ -130,7 +130,12 @@ jobs:
           $GuidePath = "$AppDir\使用指南.txt"
           [System.IO.File]::WriteAllText($GuidePath, $GuideContent, [System.Text.Encoding]::UTF8)
 
+          Write-Host "执行安全轻量瘦身 (清理 Tcl/Tk 冗余外语翻译与世界时区表)..." -ForegroundColor Cyan
+          Get-ChildItem -Path $AppDir -Filter "tzdata" -Directory -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+          Get-ChildItem -Path $AppDir -Filter "msgs" -Directory -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+
           $tag = "${{ github.event.inputs.tag_name }}"
+          $7zName = "IDCard_Assistant_${tag}_Windows_x64_Portable.7z"
           $zipName = "IDCard_Assistant_${tag}_Windows_x64_Portable.zip"
 
           # 寻找 7z 命令并执行最高压缩率极限压缩
@@ -140,16 +145,24 @@ jobs:
           }
 
           if ($7zCmd) {
-              Write-Host "检测到 7-Zip ($7zCmd)，正在启用 9 级极限压缩算法..." -ForegroundColor Green
-              # 采用标准 zip 容器 + Deflate/LZMA 极限参数 (任何解压软件均可无障碍解压，但体积缩减极其明显)
+              Write-Host "检测到 7-Zip ($7zCmd)，正在生成 .7z 极限固实便携包 (Solid LZMA2)..." -ForegroundColor Green
+              & $7zCmd a -t7z -m0=lzma2 -mx=9 -ms=on -mfb=273 -md=64m "$7zName" "$AppDir"
+
+              Write-Host "正在生成标准通用兼容 .zip 便携包..." -ForegroundColor Green
               & $7zCmd a -tzip -mx=9 -mfb=258 -mpass=15 "$zipName" "$AppDir"
           } else {
               Write-Host "未检测到 7-Zip，回退使用系统压缩..." -ForegroundColor Yellow
               Compress-Archive -Path $AppDir -DestinationPath ".\$zipName" -Force
           }
 
-          $zipSize = (Get-Item $zipName).Length / 1MB
-          Write-Host "绿色便携包极限压缩完成: $zipName (${zipSize:N2} MB)" -ForegroundColor Green
+          if (Test-Path $7zName) {
+              $s7z = (Get-Item $7zName).Length / 1MB
+              Write-Host "✅ 7z 固实便携包构建完成: $7zName (${s7z:N2} MB)" -ForegroundColor Green
+          }
+          if (Test-Path $zipName) {
+              $szip = (Get-Item $zipName).Length / 1MB
+              Write-Host "✅ zip 便携包构建完成: $zipName (${szip:N2} MB)" -ForegroundColor Green
+          }
 
       - name: 发布至 GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -158,6 +171,7 @@ jobs:
           name: "${{ github.event.inputs.release_title }} (${{ github.event.inputs.tag_name }})"
           body: ${{ github.event.inputs.release_notes }}
           files: |
+            IDCard_Assistant_${{ github.event.inputs.tag_name }}_Windows_x64_Portable.7z
             IDCard_Assistant_${{ github.event.inputs.tag_name }}_Windows_x64_Portable.zip
           draft: false
           prerelease: false

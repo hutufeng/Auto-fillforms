@@ -140,8 +140,14 @@ $GuideContent = @"
 $GuidePath = "$AppDir\使用指南.txt"
 [System.IO.File]::WriteAllText($GuidePath, $GuideContent, [System.Text.Encoding]::UTF8)
 
-# 压缩为独立便携分发包 (优先使用 7-Zip 9级极限压缩)
+Write-Host "执行安全轻量瘦身 (清理 Tcl/Tk 冗余外语翻译与世界时区表)..." -ForegroundColor Cyan
+Get-ChildItem -Path $AppDir -Filter "tzdata" -Directory -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+Get-ChildItem -Path $AppDir -Filter "msgs" -Directory -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+
+# 压缩为独立便携分发包 (优先使用 7-Zip 9级固实极限压缩)
+$SevenZipOut = ".\dist\身份证智能录入与扫描助手_绿色便携版.7z"
 $ZipOut = ".\dist\身份证智能录入与扫描助手_绿色便携版.zip"
+if (Test-Path $SevenZipOut) { Remove-Item $SevenZipOut -Force }
 if (Test-Path $ZipOut) { Remove-Item $ZipOut -Force }
 
 $7zCmd = (Get-Command 7z -ErrorAction SilentlyContinue).Source
@@ -150,16 +156,24 @@ if (-not $7zCmd -and (Test-Path "C:\Program Files\7-Zip\7z.exe")) {
 }
 
 if ($7zCmd) {
-    Write-Host "检测到 7-Zip ($7zCmd)，正在启用 9 级极限压缩算法..." -ForegroundColor Green
+    Write-Host "检测到 7-Zip ($7zCmd)，正在生成 .7z 极限固实便携包 (Solid LZMA2)..." -ForegroundColor Green
+    & $7zCmd a -t7z -m0=lzma2 -mx=9 -ms=on -mfb=273 -md=64m "$SevenZipOut" "$AppDir"
+
+    Write-Host "正在生成标准通用兼容 .zip 便携包..." -ForegroundColor Green
     & $7zCmd a -tzip -mx=9 -mfb=258 -mpass=15 "$ZipOut" "$AppDir"
 } else {
     Write-Host "未检测到 7-Zip，回退使用系统压缩..." -ForegroundColor Yellow
     Compress-Archive -Path $AppDir -DestinationPath $ZipOut -Force
 }
 
-$zipSize = (Get-Item $ZipOut).Length / 1MB
-
 Write-Host "`n✅ 构建成果已存放于 dist/ 目录：" -ForegroundColor Cyan
 Write-Host "   📁 dist\身份证智能录入与扫描助手\   (绿色免安装程序文件夹，秒级启动)" -ForegroundColor Green
-Write-Host "   📦 $ZipOut (${zipSize:N2} MB)" -ForegroundColor Green
+if (Test-Path $SevenZipOut) {
+    $sz7z = (Get-Item $SevenZipOut).Length / 1MB
+    Write-Host "   📦 $SevenZipOut (${sz7z:N2} MB，固实极限推荐)" -ForegroundColor Green
+}
+if (Test-Path $ZipOut) {
+    $szip = (Get-Item $ZipOut).Length / 1MB
+    Write-Host "   📦 $ZipOut (${szip:N2} MB，通用兼容)" -ForegroundColor Green
+}
 Write-Host "==========================================================" -ForegroundColor Cyan
