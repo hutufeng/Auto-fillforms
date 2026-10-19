@@ -21,13 +21,13 @@ Write-Host "[1/4] 使用 Python 解释器: $py" -ForegroundColor Yellow
 
 # 检查并安装 PyInstaller
 Write-Host "[2/4] 检查打包必备工具 (PyInstaller)..." -ForegroundColor Yellow
-& $py -m pip install --quiet pyinstaller pywebview cryptography
+& $py -m pip install --quiet pyinstaller cryptography
 
 # 清理旧的构建残留
 if (Test-Path ".\build") { Remove-Item -Path ".\build" -Recurse -Force }
 if (Test-Path ".\dist") { Remove-Item -Path ".\dist" -Recurse -Force }
 
-Write-Host "[3/4] 开始执行 PyInstaller 绿色免安装版封装 (秒级极速冷启动)..." -ForegroundColor Yellow
+Write-Host "[3/4] 开始执行 PyInstaller 绿色免安装版封装 (秒级极速冷启动 + 模块瘦身)..." -ForegroundColor Yellow
 
 # 打包命令 (绿色便携目录模式，无黑框，无需每次启动临时解压 120MB，实现毫秒级秒开):
 & $py -m PyInstaller `
@@ -46,6 +46,19 @@ Write-Host "[3/4] 开始执行 PyInstaller 绿色免安装版封装 (秒级极�
     --hidden-import "fitz" `
     --collect-all "customtkinter" `
     --collect-all "rapidocr_onnxruntime" `
+    --exclude-module "matplotlib" `
+    --exclude-module "scipy" `
+    --exclude-module "pandas" `
+    --exclude-module "torch" `
+    --exclude-module "IPython" `
+    --exclude-module "notebook" `
+    --exclude-module "pytest" `
+    --exclude-module "unittest" `
+    --exclude-module "pydoc" `
+    --exclude-module "test" `
+    --exclude-module "lib2to3" `
+    --exclude-module "tkinter.test" `
+    --exclude-module "pywebview" `
     app_gui.py
 
 Write-Host "[4/4] 打包完成！生成配套使用指南并归档为便携 ZIP..." -ForegroundColor Green
@@ -130,12 +143,26 @@ $GuideContent = @"
 $GuidePath = "$AppDir\使用指南.txt"
 [System.IO.File]::WriteAllText($GuidePath, $GuideContent, [System.Text.Encoding]::UTF8)
 
-# 压缩为独立便携分发包
+# 压缩为独立便携分发包 (优先使用 7-Zip 9级极限压缩)
 $ZipOut = ".\dist\身份证智能录入与扫描助手_绿色便携版.zip"
 if (Test-Path $ZipOut) { Remove-Item $ZipOut -Force }
-Compress-Archive -Path $AppDir -DestinationPath $ZipOut -Force
+
+$7zCmd = (Get-Command 7z -ErrorAction SilentlyContinue).Source
+if (-not $7zCmd -and (Test-Path "C:\Program Files\7-Zip\7z.exe")) {
+    $7zCmd = "C:\Program Files\7-Zip\7z.exe"
+}
+
+if ($7zCmd) {
+    Write-Host "检测到 7-Zip ($7zCmd)，正在启用 9 级极限压缩算法..." -ForegroundColor Green
+    & $7zCmd a -tzip -mx=9 -mfb=258 -mpass=15 "$ZipOut" "$AppDir"
+} else {
+    Write-Host "未检测到 7-Zip，回退使用系统压缩..." -ForegroundColor Yellow
+    Compress-Archive -Path $AppDir -DestinationPath $ZipOut -Force
+}
+
+$zipSize = (Get-Item $ZipOut).Length / 1MB
 
 Write-Host "`n✅ 构建成果已存放于 dist/ 目录：" -ForegroundColor Cyan
 Write-Host "   📁 dist\身份证智能录入与扫描助手\   (绿色免安装程序文件夹，秒级启动)" -ForegroundColor Green
-Write-Host "   📦 dist\身份证智能录入与扫描助手_绿色便携版.zip (买家开箱即用压缩包)" -ForegroundColor Green
+Write-Host "   📦 $ZipOut (${zipSize:N2} MB)" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan

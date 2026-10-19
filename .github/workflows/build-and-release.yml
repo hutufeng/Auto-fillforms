@@ -43,9 +43,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller pywebview
+          pip install pyinstaller
 
-      - name: 执行 PyInstaller 绿色免安装版编译封装 (秒级极速冷启动)
+      - name: 执行 PyInstaller 绿色免安装版编译封装 (秒级极速冷启动 + 模块瘦身)
         shell: pwsh
         run: |
           Write-Host "开始执行 PyInstaller 绿色免安装版封装..." -ForegroundColor Cyan
@@ -65,9 +65,22 @@ jobs:
             --hidden-import "fitz" `
             --collect-all "customtkinter" `
             --collect-all "rapidocr_onnxruntime" `
+            --exclude-module "matplotlib" `
+            --exclude-module "scipy" `
+            --exclude-module "pandas" `
+            --exclude-module "torch" `
+            --exclude-module "IPython" `
+            --exclude-module "notebook" `
+            --exclude-module "pytest" `
+            --exclude-module "unittest" `
+            --exclude-module "pydoc" `
+            --exclude-module "test" `
+            --exclude-module "lib2to3" `
+            --exclude-module "tkinter.test" `
+            --exclude-module "pywebview" `
             app_gui.py
 
-      - name: 生成配套使用指南并归档为便携 ZIP
+      - name: 生成配套使用指南并执行 7-Zip 9级极限压缩
         shell: pwsh
         run: |
           $AppDir = ".\dist\身份证智能录入与扫描助手"
@@ -121,9 +134,23 @@ jobs:
           $tag = "${{ github.event.inputs.tag_name }}"
           $zipName = "IDCard_Assistant_${tag}_Windows_x64_Portable.zip"
 
-          # 将整个绿色免安装文件夹打包为便携 ZIP
-          Compress-Archive -Path $AppDir -DestinationPath ".\$zipName" -Force
-          Write-Host "绿色便携包打包完成: $zipName" -ForegroundColor Green
+          # 寻找 7z 命令并执行最高压缩率极限压缩
+          $7zCmd = (Get-Command 7z -ErrorAction SilentlyContinue).Source
+          if (-not $7zCmd -and (Test-Path "C:\Program Files\7-Zip\7z.exe")) {
+              $7zCmd = "C:\Program Files\7-Zip\7z.exe"
+          }
+
+          if ($7zCmd) {
+              Write-Host "检测到 7-Zip ($7zCmd)，正在启用 9 级极限压缩算法..." -ForegroundColor Green
+              # 采用标准 zip 容器 + Deflate/LZMA 极限参数 (任何解压软件均可无障碍解压，但体积缩减极其明显)
+              & $7zCmd a -tzip -mx=9 -mfb=258 -mpass=15 "$zipName" "$AppDir"
+          } else {
+              Write-Host "未检测到 7-Zip，回退使用系统压缩..." -ForegroundColor Yellow
+              Compress-Archive -Path $AppDir -DestinationPath ".\$zipName" -Force
+          }
+
+          $zipSize = (Get-Item $zipName).Length / 1MB
+          Write-Host "绿色便携包极限压缩完成: $zipName (${zipSize:N2} MB)" -ForegroundColor Green
 
       - name: 发布至 GitHub Releases
         uses: softprops/action-gh-release@v2
