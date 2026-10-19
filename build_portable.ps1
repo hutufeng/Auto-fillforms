@@ -61,9 +61,15 @@ Write-Host "[3/4] 开始执行 PyInstaller 绿色免安装版封装 (秒级极�
     --exclude-module "pywebview" `
     app_gui.py
 
-Write-Host "[4/4] 打包完成！生成配套使用指南并归档为便携 ZIP..." -ForegroundColor Green
-
 $AppDir = ".\dist\身份证智能录入与扫描助手"
+
+Write-Host "执行绿色运行目录定向安全瘦身清理..." -ForegroundColor Cyan
+# 1. 剔除完全用不到的 25MB ffmpeg 视频解码库
+Get-ChildItem -Path $AppDir -Filter "opencv_videoio_ffmpeg*.dll" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+# 2. 剔除开发静态库 .lib (运行时完全不需要)
+Get-ChildItem -Path $AppDir -Filter "*.lib" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+# 3. 剔除闲置的传统 Haar 分类器 XML
+Get-ChildItem -Path $AppDir -Filter "haarcascade_*.xml" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
 
 # 生成配套说明书至绿色应用文件夹根目录
 $GuideContent = @"
